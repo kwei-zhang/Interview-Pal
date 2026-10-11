@@ -22,8 +22,17 @@ before(async () => {
   await db.exec(readFileSync("supabase/migrations/202610100001_foundation.sql", "utf8"));
   await db.exec(readFileSync("supabase/migrations/202610100002_interview_agent.sql", "utf8"));
   await db.exec(readFileSync("supabase/seed.sql", "utf8"));
+  await db.exec("update public.problem_definitions set data = data || '{\"tests\":[{\"name\":\"public example\",\"args\":[],\"expected\":0,\"example\":true},{\"name\":\"retired case\",\"args\":[],\"expected\":1}]}'::jsonb where problem_id='contains-duplicate'");
+  await db.exec(readFileSync("supabase/migrations/202610100003_llm_judging.sql", "utf8"));
 });
 after(async () => {await db.close();});
+
+test("LLM judging migration removes fixed suites and preserves public examples", async () => {
+  await db.exec("reset role");
+  const result = await db.query<{data: {examples: {name: string}[]; tests?: unknown}}>("select data from public.problem_definitions where problem_id='contains-duplicate'");
+  assert.equal(result.rows[0].data.tests, undefined);
+  assert.deepEqual(result.rows[0].data.examples.map(e => e.name), ["public example"]);
+});
 
 test("Agent requests have separate persistent quotas and owner-only access", async () => {
   await signIn(owner);

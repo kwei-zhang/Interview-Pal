@@ -20,8 +20,8 @@ test("Dashboard and complete curriculum support meaningful filters", async ({pag
   await page.screenshot({path: "/private/tmp/interview-pal-dashboard.png"});
   await page.getByRole("link", {name: "Coding practice 150"}).click();
   await expect(page.getByText("1–25 of 150 problems")).toBeVisible();
-  await page.getByRole("checkbox", {name: "Interview available", exact: true}).check();
-  await expect(page.locator("tbody tr")).toHaveCount(15);
+  await expect(page.getByRole("checkbox", {name: "Python checks"})).toHaveCount(0);
+  await expect(page.locator("tbody tr")).toHaveCount(25);
   await page.getByLabel("Search coding problems").fill("3Sum");
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.getByRole("link", {name: /3Sum/})).toBeVisible();
@@ -233,7 +233,7 @@ test("Typed code verification is preserved in the completed review", async ({pag
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate");
   await page.getByLabel("Solution code", {exact: true}).fill("def containsDuplicate(nums): return len(nums) != len(set(nums))");
-  await page.getByRole("button", {name: "Ask interviewer to verify"}).click();
+  await page.getByRole("button", {name: "Ask interviewer to judge"}).click();
   await expect(page.locator(".test-panel")).toContainText("1 / 1 tests");
   await page.getByRole("button", {name: "Finish session"}).click();
   await expect(page).toHaveURL(/\/history\//);
@@ -242,4 +242,60 @@ test("Typed code verification is preserved in the completed review", async ({pag
   await expect(page.getByText("Python passed the supplied checks.")).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("interview-pal.workspace.v1")!));
   expect(saved.attempts).toHaveLength(1); expect(saved.attempts[0].code).toContain("len(set(nums))");
+});
+
+
+test("All 150 interview questions are available, including class-design tasks and saved drafts", async ({page}) => {
+  await page.goto("/interviews?question=lru-cache&timed=false");
+  await expect(page.getByLabel("Problem", {exact: true}).locator("option")).toHaveCount(150);
+  await expect(page.getByLabel("Problem", {exact: true})).toHaveValue("lru-cache");
+  await page.getByLabel("Focus area").selectOption("Advanced Graphs");
+  await expect(page.getByLabel("Problem", {exact: true}).locator("option")).toHaveCount(6);
+  await page.getByLabel("Problem", {exact: true}).selectOption("alien-dictionary");
+  await page.getByRole("button", {name: "Enter practice room"}).click();
+  await expect(page.getByRole("heading", {name: "Alien Dictionary", exact: true})).toBeVisible();
+  await expect(page.locator(".problem-prompt")).toContainText("unknown alphabet");
+  await expect(page.getByLabel("Solution code", {exact: true})).toBeVisible();
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/def alienOrder\(words: List\[str\]\) -> str:/);
+  await expect(page.getByRole("button", {name: "Ask interviewer to judge"})).toBeEnabled();
+  await page.getByLabel("Solution code", {exact: true}).fill("# saved alien dictionary approach");
+  await page.reload();
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue("# saved alien dictionary approach");
+  await page.getByRole("button", {name: "Finish session"}).click();
+  await expect(page).toHaveURL(/\/history\//);
+  await expect(page.getByRole("heading", {name: /Alien Dictionary/})).toBeVisible();
+  await page.goto("/coding/lru-cache");
+  await expect(page.locator(".problem-prompt")).toContainText("least recently used");
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/class LRUCache:[\s\S]*def __init__\(self, capacity: int\)/);
+  await page.getByLabel("Solution code", {exact: true}).fill("# Write or paste your Python solution here.\n");
+  await page.reload();
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/class LRUCache:/);
+  await page.getByLabel("Coding language").selectOption("typescript");
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/class LRUCache[\s\S]*constructor\(capacity: number\)[\s\S]*get\(key: number\): number/);
+  await page.getByLabel("Coding language").selectOption("javascript");
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/class LRUCache[\s\S]*constructor\(capacity\)[\s\S]*put\(key, value\)/);
+  await page.getByRole("link", {name: "Practice this in an interview"}).click();
+  await expect(page.getByLabel("Problem", {exact: true})).toHaveValue("lru-cache");
+});
+
+test("LLM reasoning judgments are clearly labeled and survive saved reviews", async ({page}) => {
+  await page.route("**/api/interview-agent", route => {
+    const body = route.request().postDataJSON();
+    if (body.action === "feedback") return route.fulfill({json: {feedback: {source: "agent", summary: "Code was reviewed by reasoning.", strengths: [], improvements: [], evidence: [], nextActions: [], dimensions: []}}});
+    const attempts = body.session.transcript.some((e: {text: string}) => e.text.includes("Please judge")) ? [{id: crypto.randomUUID(), provider: "openai-judge", sessionId: body.session.id, problemId: body.session.questionId, problemVersion: 1, language: "typescript", code: body.context.code, mode: "submit", createdAt: new Date().toISOString(), result: {status: "reviewed", stdout: "", tests: [], assessment: {method: "llm-review", verdict: "inconclusive", summary: "Required cache methods are incomplete."}}}] : [];
+    return route.fulfill({json: {text: "This is a reasoning assessment; the TypeScript was not executed.", attempts}});
+  });
+  await page.goto("/interviews?question=lru-cache&timed=false");
+  await page.getByLabel("Coding language").selectOption("typescript");
+  await page.getByRole("button", {name: "Enter practice room"}).click();
+  await page.getByLabel("Solution code", {exact: true}).fill("class LRUCache {}");
+  await page.getByRole("button", {name: "Ask interviewer to judge"}).click();
+  await expect(page.locator(".test-panel")).toContainText("AI review · not executed");
+  await expect(page.locator(".test-panel")).toContainText("inconclusive");
+  await expect(page.locator(".test-panel")).not.toContainText("Passed");
+  await page.getByRole("button", {name: "Finish session"}).click();
+  await expect(page).toHaveURL(/\/history\//);
+  await page.reload();
+  await page.getByText("TypeScript · AI reasoning review").click();
+  await expect(page.getByText("Required cache methods are incomplete.", {exact: false})).toBeVisible();
 });

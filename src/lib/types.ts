@@ -14,7 +14,7 @@ export interface Problem {
   collectionId: string;
   runnable: boolean;
 }
-export interface TestCase { name: string; args: Json[]; expected: Json; example?: boolean }
+export interface ProblemExample { name: string; args: Json[]; expected: Json }
 export interface ProblemDefinition {
   id: string;
   version: number;
@@ -24,8 +24,7 @@ export interface ProblemDefinition {
   parameters: {name: string; py: string; ts: string}[];
   returnType: {py: string; ts: string};
   inputKind?: "linked-list" | "binary-tree";
-  comparison?: "exact" | "unordered-groups" | "unordered-items" | "two-sum";
-  tests: TestCase[];
+  examples: ProblemExample[];
 }
 export interface ProblemProgress {
   problemId: string;
@@ -61,16 +60,17 @@ export interface InterviewSession {
   // "mock" is retained only to read historical sessions; all new/resumed sessions use "agent".
   adapter: "mock" | "agent";
 }
-export interface TestResult {name: string; passed: boolean; actual?: Json; expected?: Json; error?: string}
+export interface TestResult {name: string; input?: string; passed: boolean; actual?: Json; expected?: Json; error?: string}
 export interface ExecutionResult {
-  status: "queued" | "running" | "passed" | "failed" | "error" | "timeout";
+  status: "queued" | "running" | "passed" | "failed" | "reviewed" | "error" | "timeout";
   tests: TestResult[]; stdout: string; error?: string;
   runtimeMs?: number; memoryKb?: number;
+  assessment?: {method: "llm-review" | "llm-generated-execution"; verdict: "likely-correct" | "incorrect" | "inconclusive"; summary: string};
 }
 export interface Attempt {
   id: string; problemId: string; problemVersion: number; language: Language;
   code: string; mode: "run" | "submit"; sessionId?: string;
-  createdAt: string; provider?: "openai-code-interpreter"; providerJobId?: string; result: ExecutionResult;
+  createdAt: string; provider?: "openai-code-interpreter" | "openai-judge"; providerJobId?: string; result: ExecutionResult;
 }
 export interface Profile {displayName: string; targetRole: string; weeklyGoal: number}
 export interface WorkspaceData {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, AudioLines, BookOpen, CalendarDays, CheckCircle2, Code2, Flame, Lightbulb, Play, Sparkles, Star, Target } from "lucide-react";
-import { problems, runnableProblems, topics, problemById } from "@/lib/data/catalog";
+import { problems, topics, problemById } from "@/lib/data/catalog";
 import { useWorkspace } from "./workspace-provider";
 import { Badge, DifficultyBadge, EmptyState, PageHeading, SectionTitle, relativeDate } from "./ui";
 
@@ -13,7 +13,7 @@ export function Dashboard() {
   const completed = data.sessions.filter(s => s.status === "completed");
   const weekAgo = Date.now() - 7 * 86400000;
   const weekCount = completed.filter(s => Date.parse(s.startedAt) > weekAgo).length + problems.filter(p => data.progress[p.id]?.status === "solved" && Date.parse(data.progress[p.id].updatedAt) > weekAgo).length;
-  const next = runnableProblems.find(p => progressFor(p.id).status === "practicing") || runnableProblems.find(p => progressFor(p.id).status !== "solved") || runnableProblems[0];
+  const next = problems.find(p => progressFor(p.id).status === "practicing") || problems.find(p => progressFor(p.id).status !== "solved") || problems[0];
   const recent = data.sessions.slice(0, 3);
   const focusTopics = [...topics].sort((a, b) => problems.filter(p => p.topic === b && progressFor(p.id).status === "solved").length - problems.filter(p => p.topic === a && progressFor(p.id).status === "solved").length).slice(0, 5);
   const metrics = [

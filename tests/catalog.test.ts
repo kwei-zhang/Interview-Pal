@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { problems, topics, runnableProblems } from "../src/lib/data/catalog";
+import { problems, topics } from "../src/lib/data/catalog";
+import { interviewQuestion } from "../src/lib/problems/interview-questions";
+import { sessionSchema } from "../src/lib/validation";
+import { interviewerInstructions } from "../src/lib/server/openai-interviewer";
 import { definitions } from "../src/lib/problems/definitions";
 import { behavioralQuestions } from "../src/lib/data/behavioral";
 import { interviewModules } from "../src/lib/interview/modules";
@@ -12,9 +15,8 @@ test("Verified NeetCode curriculum has 150 unique entries and the expected distr
   assert.equal(problems.filter(p => p.topic === "Backtracking").length, 10);
   assert.ok(problems.every(p => p.sourceUrl === `https://leetcode.com/problems/${p.id}/`));
 });
-test("All 15 runnable definitions have examples and edge cases", () => {
-  assert.equal(runnableProblems.length, 15);
-  for (const p of runnableProblems) {const d = definitions[p.id]; assert.ok(d); assert.ok(d.tests.length >= 5); assert.equal(d.tests.filter(t => t.example).length, 2);}
+test("The original briefs keep public examples without fixed tests", () => {
+  for (const d of Object.values(definitions)) {assert.equal(d.examples.length, 2); assert.equal("tests" in d, false);}
 });
 test("Behavioral questions and module capabilities are independent of coding", () => {
   assert.equal(behavioralQuestions.length, 20);
@@ -22,4 +24,23 @@ test("Behavioral questions and module capabilities are independent of coding", (
   assert.ok(interviewModules.coding.capabilities.includes("code"));
   assert.ok(!interviewModules.behavioral.capabilities.includes("code"));
   assert.equal(interviewModules.behavioral.questions.length, 20);
+});
+
+
+test("All 150 catalog problems are selectable, valid sessions with grounded interview context", () => {
+  assert.deepEqual(interviewModules.coding.questions.map(q => q.id), problems.map(p => p.id));
+  const now = new Date().toISOString();
+  for (const problem of problems) {
+    const brief = interviewQuestion(problem.id);
+    assert.ok(brief, problem.id);
+    assert.ok(brief.prompt.length > 40, problem.id);
+    assert.ok(brief.examples.length > 0 && brief.examples.every(e => e.input && e.output), problem.id);
+    assert.ok(Object.values(brief.starters).every(code => code.length > 0), problem.id);
+    const session = sessionSchema.parse({id: crypto.randomUUID(), type: "coding", roleId: "software-engineer", questionId: problem.id, language: "python", durationMinutes: 45, timed: true, status: "active", startedAt: now, lastActiveAt: now, elapsedSeconds: 0, scratchpad: "", transcript: [], adapter: "agent"});
+    const instructions = interviewerInstructions({action: "reply", session});
+    assert.ok(instructions.includes(brief.prompt), problem.id);
+    assert.ok(instructions.includes(problem.sourceUrl), problem.id);
+    assert.ok(instructions.includes(JSON.stringify(brief.starters.python)), problem.id);
+  }
+  assert.equal(interviewQuestion("does-not-exist"), undefined);
 });

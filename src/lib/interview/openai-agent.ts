@@ -72,7 +72,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
     if (this.disposed || this.ending) return Promise.resolve({error: "Interview ended; no verification started."});
     const snapshot = {...this.context};
     this.verificationPending = (async () => {
-      const result = await this.request("verify", AbortSignal.timeout(65000));
+      const result = await this.request("verify", AbortSignal.timeout(120000));
       const attempt: Attempt | undefined = result.attempts?.[0];
       if (!attempt) throw new Error("No verification result was returned.");
       return {scope: "Original problem only; not LeetCode acceptance", language: attempt.language, matchesCurrentDraft: snapshot.code === this.context.code && snapshot.language === this.context.language, ...attempt.result};
@@ -108,7 +108,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
     this.busy = true;
     const abort = new AbortController(); this.abort = abort;
     try {
-      const result = await this.request("reply", AbortSignal.any([abort.signal, AbortSignal.timeout(160000)]));
+      const result = await this.request("reply", AbortSignal.any([abort.signal, AbortSignal.timeout(220000)]));
       if (this.disposed || this.ending) return;
       if (typeof result.text !== "string" || !result.text.trim() || result.text.length > 10000) throw new Error("The interviewer response could not be read. Please retry.");
       this.say("interviewer", result.text); this.retryText = undefined;

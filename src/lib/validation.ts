@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { behavioralQuestions } from "./data/behavioral";
-import { definitions } from "./problems/definitions";
+import { problemById } from "./data/catalog";
 import { competencies, languages } from "./types";
 
 const shortText = z.string().max(200);
@@ -29,7 +29,7 @@ export const sessionSchema = z.object({
   durationMinutes: z.number().int().min(5).max(120), timed: z.boolean(), language,
   status: z.enum(["active", "completed", "interrupted"]), startedAt: timestamp, endedAt: timestamp.optional(), lastActiveAt: timestamp, elapsedSeconds: z.number().int().min(0).max(86400),
   scratchpad: notes, transcript: z.array(transcriptSchema).max(500), feedback: feedbackSchema.optional(), adapter: z.enum(["mock", "agent"]),
-}).strict().refine(s => s.type === "coding" ? Boolean(definitions[s.questionId]) : behavioralQuestions.some(q => q.id === s.questionId), {message: "Choose an available interview question."});
+}).strict().refine(s => s.type === "coding" ? Boolean(problemById(s.questionId)) : behavioralQuestions.some(q => q.id === s.questionId), {message: "Choose an available interview question."});
 export const mutationSchema = z.discriminatedUnion("kind", [
   z.object({kind: z.literal("profile"), value: profileSchema}).strict(),
   z.object({kind: z.literal("progress"), value: progressSchema}).strict(),
@@ -39,9 +39,3 @@ export const mutationSchema = z.discriminatedUnion("kind", [
   z.object({kind: z.literal("session"), value: sessionSchema}).strict(),
   z.object({kind: z.literal("delete-session"), id: uuid}).strict(),
 ]);
-export const customTestSchema = z.object({name: shortText.optional(), args: z.array(z.json()).max(5), expected: z.json()}).strict();
-export const executionSchema = z.object({
-  problemId: z.string().refine(id => Boolean(definitions[id]), "This problem is not runnable yet."),
-  language, code: z.string().min(1).max(50000), mode: z.enum(["run", "submit"]), sessionId: uuid.optional(),
-  customTests: z.array(customTestSchema).max(10).optional(),
-}).strict();

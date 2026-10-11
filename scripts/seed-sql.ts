@@ -12,4 +12,4 @@ const statements = [
   ...behavioralQuestions.map(q => `insert into public.behavioral_questions(id,role_id,data) values (${sql(q.id)},'software-engineer',${sql(q)}::jsonb) on conflict (id) do update set data=excluded.data;`),
 ];
 writeFileSync("supabase/seed.sql", statements.join("\n") + "\n");
-console.log(`Generated SQL for ${problems.length} problems, ${Object.keys(definitions).length} runnable definitions, and ${behavioralQuestions.length} behavioral questions.`);
+console.log(`Generated SQL for ${problems.length} problems, ${Object.keys(definitions).length} original problem briefs, and ${behavioralQuestions.length} behavioral questions.`);

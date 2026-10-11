@@ -3,7 +3,7 @@ import { assertSameOrigin, errorResponse, HttpError, readJson } from "@/lib/serv
 import { requireUser, supabaseConfigured } from "@/lib/server/supabase";
 import { agentRequestSchema, callInterviewer } from "@/lib/server/openai-interviewer";
 
-export const maxDuration = 180;
+export const maxDuration = 210;
 const localRequests = new Map<string, number[]>();
 export async function POST(request: Request) {
   try {

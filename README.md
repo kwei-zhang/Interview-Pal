@@ -5,8 +5,8 @@ A private interview preparation workspace built with Next.js, TypeScript, Tailwi
 ## What is implemented
 
 - Dashboard with real progress, topic breakdowns, review items, and recent sessions.
-- All 150 NeetCode catalog entries, searchable by topic, difficulty, progress, and interview availability. Metadata comes from the [official NeetCode repository](https://github.com/neetcode-gh/leetcode); prompts and test cases are independently authored.
-- Practice all 150 problems on LeetCode, with links, notes, progress, and optional saved drafts here. Fifteen authored questions are available for interviews with Python, JavaScript, and TypeScript editors. During interviews, ask the agent to verify the editor code; Python executes via OpenAI Code Interpreter. JavaScript and TypeScript execution stays on LeetCode.
+- All 150 NeetCode catalog entries, searchable by topic, difficulty, and progress. Metadata comes from the [official NeetCode repository](https://github.com/neetcode-gh/leetcode); prompts and public examples are independently authored.
+- Practice all 150 problems on LeetCode, with links, notes, progress, and optional saved drafts here. All 150 questions have authored interview briefs and examples with Python, JavaScript, and TypeScript editors. All 150 support LLM judgment of the editor code. The LLM selects Python cases for OpenAI Code Interpreter; JavaScript and TypeScript receive reasoning reviews without execution. There are no bundled problem test suites.
 - Per-language code drafts, notes, attempts, progress, and separate review flags.
 - STAR stories with reflections, competency tags, and links to multiple questions. Twenty original behavioral questions.
 - Coding and behavioral interview rooms, timers, microphone preflight, live voice input/playback, typed responses, scratchpads, ordered transcripts, interrupted-session resume, and saved reviews.
@@ -30,7 +30,7 @@ Monaco assets are copied from the installed dependency to `public/vendor/monaco`
 
 ## Configure Supabase and your private account
 
-1. Create a Supabase project. In its SQL Editor run `supabase/migrations/202610100001_foundation.sql`, then `supabase/migrations/202610100002_interview_agent.sql`, then `supabase/seed.sql`. Run the migration once. The seed can be rerun to update catalogs.
+1. Create a Supabase project. In its SQL Editor run the three files in `supabase/migrations` in filename order, then `supabase/seed.sql`. For an existing project, apply `202610100003_llm_judging.sql` to retire catalog test suites while preserving personal work. Each migration runs once; the seed can be rerun to update catalogs.
 2. In Authentication settings, disable **Allow new users to sign up**. The local Supabase configuration already has `enable_signup = false`; a hosted project must be configured separately.
 3. In Authentication → Users, create your own user with an email and password and mark the email confirmed. The app intentionally has no signup page.
 4. Copy `.env.example` to `.env.local` and fill these values from your project's **Connect** dialog:
@@ -48,13 +48,13 @@ To use the Supabase CLI instead of the SQL Editor, install the CLI separately, l
 
 ## Interview code verification
 
-Practice and submit code on LeetCode. During an interview, paste your solution into the editor and say “Please verify my code,” or explicitly state that your editor solution is finished. The interviewer can call the `verify_code` function in typed chat or live voice. The **Ask interviewer to verify** button sends that request too. The app cannot read an external LeetCode tab or synchronize LeetCode results.
+Practice and submit code on LeetCode. During an interview, paste your solution into the editor and say “Please verify my code,” or explicitly state that your editor solution is finished. The interviewer can call the `verify_code` function in typed chat or live voice. The **Ask interviewer to judge** button sends that request too. The app cannot read an external LeetCode tab or synchronize LeetCode results.
 
 The server uses [OpenAI Code Interpreter](https://developers.openai.com/api/docs/guides/tools-code-interpreter) through the Responses API with the configured `OPENAI_INTERVIEW_MODEL`. That model must support Code Interpreter. This uses the same API key and incurs OpenAI tool/container charges; no separate runner, Docker setup, or compiler credentials are needed.
 
-- Python is the supported execution language. JavaScript and TypeScript remain available for editing and conceptual review, with an explicit “not executed” result if verification is requested. No automatic translation is used.
+- Python is the supported execution language. JavaScript and TypeScript remain available for editing and conceptual review, with a saved “AI review · not executed” assessment when judging is requested. No automatic translation is used.
 - The candidate source is saved before execution, included unchanged in an uploaded test program, and checked by hash in the sandbox. Both the app's standalone function and LeetCode's `Solution` class format are supported. A fixed driver runs it in a subprocess with a five-second wall timeout, CPU/memory/output limits, and disabled container networking. The server requires actual Code Interpreter output from that exact driver; it does not accept an LLM's claim of passing tests.
-- Verification checks Interview Pal's original-problem tests, not LeetCode acceptance or follow-up variants. Expected/actual comparisons run on the server. The interviewer must continue to obey the completion and answer-reveal rules.
+- The LLM independently chooses cases and expected outputs from the original brief. Actual Python outputs are compared on the server against those AI-generated expectations. This is an AI assessment, not an authoritative judge or LeetCode acceptance; a mistaken expected value or runner can cause a misleading mismatch. The interviewer must validate a counterexample before revealing an answer and continue to obey the candidate-completion rule. Follow-up variants are assessed conversationally, separately from the original question.
 - Attempts and their code snapshots survive provider failures. Old attempts remain available. Results for edited code are marked stale. Drafts over the 12,000-character agent context limit are not executed as partial programs.
 - Uploaded files are deleted after each request and also have a one-hour expiry. Containers are deleted when their IDs are returned; an interrupted request may leave a container until OpenAI expires it. No raw code, output, or transcripts are written to operational logs.
 - Cloud verification requires an owned active session and uses the existing execution quota (10/minute, 300/day) as well as the agent request quota. Local preview uses the agent request limit. A session interrupted by a lost request may retain a pending attempt; retry from the saved draft rather than treating it as a failed solution.
@@ -75,7 +75,7 @@ All interviews use OpenAI. Starting a new interview requires a configured API ke
 
 For a cloud workspace, apply `supabase/migrations/202610100002_interview_agent.sql` as well as the foundation migration. The agent endpoint requires private login and an owned, saved, active session. The only exception is development on localhost without Supabase, where a local demo can connect for testing. Responses requests use `store: false`. Operational logs include provider, session ID, action, status, and latency, never conversation text or credentials. Requests have bounded context, output tokens, and timeouts; server API requests are limited to 30/minute and 1,000/day per account. These quotas apply to connection/reply/review requests, not individual spoken turns within a connected Realtime call; configure your OpenAI project spending limits separately.
 
-A provider failure leaves candidate turns and code saved. Retrying a failed typed turn avoids duplicating the candidate message. If feedback fails, the completed review explicitly says no assessment was generated. The interviewer receives public examples and verification outcomes, not preparation notes or the story bank. The execution service alone receives the complete authored test program. Code context is capped at 12,000 characters and conversation context at 32,000; full drafts and transcripts remain in the workspace.
+A provider failure leaves candidate turns and code saved. Retrying a failed typed turn avoids duplicating the candidate message. If feedback fails, the completed review explicitly says no assessment was generated. The interviewer receives public examples and verification outcomes, not preparation notes or the story bank. The judge receives the problem brief and unchanged candidate code and generates check cases at request time. Code context is capped at 12,000 characters and conversation context at 32,000; full drafts and transcripts remain in the workspace.
 
 Verify actual microphone permission behavior, audio playback, interruptions, reconnection, transcript order, and complete coding and behavioral voice sessions on your target browser before release. Deterministic tests use provider fixtures and do not incur API charges.
 
@@ -91,14 +91,17 @@ Verify actual microphone permission behavior, audio playback, interruptions, rec
 - `src/lib/server/openai-interviewer.ts`: selects the prompt by session type and handles private OpenAI requests.
 - `src/lib/interview/browser-voice.ts`: microphone checks, browser recognition and synthesis. Unsupported/denied voice input leaves typed responses available.
 - `src/lib/server/code-verification.ts`: the interviewer verification tool, immutable Python execution driver, provider evidence validation, and cleanup.
-- `src/lib/problems`: authored prompts, examples, tests, serialization, starters, and harnesses.
+- `src/lib/problems/interview-questions.ts`: interview briefs and examples for all 150 problems, plus per-language starters and structural preludes.
+- `src/lib/problems/starters.ts`: problem-specific function signatures, class APIs, and node definitions for the additional 135 interview questions. Existing drafts are kept; untouched legacy placeholders upgrade automatically.
+- `src/lib/problems/definitions.ts`: the original 15 briefs and public examples, without fixed test suites.
+- `src/lib/problems/function-starters.ts`: function and structural starters for those original briefs.
 - `supabase/migrations`: profiles, role tracks, question collections, catalogs, drafts, progress, stories/links, sessions/events/feedback, attempts, and quota slots.
 
 To customize interview behavior, edit the `instructions` function in the matching prompt file above. Each file also contains its own `opening`, `resume`, and `feedback` instructions. Keep the dynamic question/context fields intact. Typed responses use saved changes on the next request; start a new voice session to load changed instructions.
 
 To connect another interviewer, implement `InterviewAgentAdapter` and supply its voice transport. The room uses the OpenAI adapter exclusively. The feedback format accepts agent-defined dimensions and evidence; the website does not impose a scoring rubric. Validate microphone permissions, playback, transcript ordering, disconnection/reconnection, and one complete spoken interview of each type with the real adapter before release.
 
-Adding a role means seeding a role track and collections and registering its module. More interview questions can be added through problem definitions and reference tests.
+Adding a role means seeding a role track and collections and registering its module. More interview questions can be added through briefs, examples, and starter contracts; LLM judging does not require a predefined test suite.
 
 ## Validation
 
@@ -109,11 +112,11 @@ npm run test:e2e
 npm run build
 ```
 
-Unit/integration tests run all 45 problem/language combinations against reference and representative incorrect solutions. TypeScript reference harnesses are checked with the installed compiler. Verification tests cover unchanged code, real tool evidence, unavailable providers, timeouts, and unsupported languages. They cover unordered outputs, duplicate multiplicity, linked lists/cycles, trees/empty inputs, exceptions, malformed output, timeouts, provider failures, agent event ordering, and mutation validation. PostgreSQL policy tests run the actual migration/seed in PGlite, including anonymous and cross-account access, atomic writes, stale session updates, deletion behavior, and quota enforcement.
+Regression tests validate all 450 starter declarations, LLM plan parsing, immutable candidate execution, genuine tool evidence, unordered outputs/multiplicity, stateful APIs, unavailable providers, timeouts, reasoning-only reviews, agent events, and workspace persistence. These tests protect the website and judge integration; they are not bundled coding-problem test suites. PostgreSQL policy tests run migrations/seed in PGlite, including catalog cleanup, anonymous and cross-account access, atomic writes, stale session updates, deletion behavior, and quotas.
 
 Browser tests use installed Google Chrome via Playwright. They start a separate development server on port 3100 with cloud variables overridden empty. They cover preparation, stories, completed/interrupted sessions, saved reviews, unavailable execution, responsive navigation, themes, and API origin checks. Install Chrome or adjust `playwright.config.ts` to your browser. Test reports/traces and local credentials are ignored by Git.
 
-The harness tests execute trusted reference solutions locally. User Python code is run only in OpenAI Code Interpreter. Fixture tests do not establish live model/tool access; verify a real interview code check after configuring your API key.
+Regression fixtures run locally; user Python code runs only in OpenAI Code Interpreter. Fixture tests do not establish live model/tool access; verify a real interview code check after configuring your API key.
 
 ## Deploy to Vercel
 
