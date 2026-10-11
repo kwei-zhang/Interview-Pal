@@ -1,0 +1,37 @@
+{
+  "name": "interview-pal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "node scripts/copy-monaco.mjs",
+    "dev": "next dev --webpack --hostname 127.0.0.1",
+    "build": "node scripts/copy-monaco.mjs && next build --webpack",
+    "seed:generate": "node --import tsx scripts/seed-sql.ts",
+    "start": "next start --hostname 127.0.0.1",
+    "typecheck": "next typegen && node node_modules/typescript/bin/tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.57.0",
+    "lucide-react": "^0.468.0",
+    "monaco-editor": "^0.52.0",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
