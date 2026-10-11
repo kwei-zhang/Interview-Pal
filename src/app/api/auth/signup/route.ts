@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const supabase = await serverSupabase();
     const {error} = await supabase.auth.signUp({email: input.email, password: input.password,
       options: {emailRedirectTo: `${authSiteUrl(request)}/auth/confirm`, data: {display_name: input.displayName, invite_code: input.inviteCode}}});
-    if (error) authFailure(error, "Registration could not be completed. Check your invitation and email, or use sign in / verification resend if you already registered.");
+    if (error) authFailure(error, "Registration could not be completed. Check your invitation and email, or use sign in / verification resend if you already registered.", "signup");
     return Response.json({ok: true}, {headers: {"Cache-Control": "no-store"}});
   } catch (error) { return errorResponse(error); }
 }

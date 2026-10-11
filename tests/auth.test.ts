@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { signupSchema } from "../src/lib/auth";
 import { createAccountFetch } from "../src/lib/account-client";
 import { assertAccountBinding } from "../src/lib/server/supabase";
-import { authSiteUrl } from "../src/lib/server/auth";
-import { assertSameOrigin } from "../src/lib/server/http";
+import { authFailure, authSiteUrl } from "../src/lib/server/auth";
+import { assertSameOrigin, HttpError } from "../src/lib/server/http";
 import { appPath } from "../src/lib/paths";
 
 test("Registration normalizes email and codes, enforces passwords, and rejects privilege fields", () => {
@@ -61,4 +61,22 @@ test("Proxied mutations accept the configured public origin but reject forged fo
     }
     assert.throws(() => assertSameOrigin(new Request("https://upstream.vercel.app/interview/api/auth/login")), /must come from/);
   } finally {if (previous === undefined) delete process.env.AUTH_SITE_URL; else process.env.AUTH_SITE_URL = previous;}
+});
+
+test("Signup errors distinguish email setup, password requirements, and throttling without exposing provider details", t => {
+  const logged: string[] = [];
+  t.mock.method(console, "warn", (value: string) => logged.push(value));
+  assert.throws(() => authFailure({status: 400, code: "email_address_not_authorized"}, "Fallback", "signup"),
+    (error: unknown) => error instanceof HttpError && error.status === 503 && error.code === "email_address_not_authorized" && error.message.includes("custom SMTP"));
+  assert.throws(() => authFailure({status: 422, code: "weak_password"}, "Fallback", "signup"),
+    (error: unknown) => error instanceof HttpError && error.status === 400 && error.message.includes("password requirements"));
+  assert.throws(() => authFailure({status: 429, code: "over_email_send_rate_limit"}, "Fallback", "signup"),
+    (error: unknown) => error instanceof HttpError && error.status === 429 && error.message.includes("account emails"));
+  const providerError = {status: 400, code: "private@example.test", message: "secret password and invitation code"};
+  assert.throws(() => authFailure(providerError, "Safe fallback", "signup"),
+    (error: unknown) => error instanceof HttpError && error.message === "Safe fallback" && error.code === "auth_request_rejected");
+  assert.equal(logged.length, 4);
+  assert.equal(JSON.parse(logged[0]).code, "email_address_not_authorized");
+  assert.equal(JSON.parse(logged[3]).code, "unclassified");
+  assert.doesNotMatch(logged.join(""), /private@example|secret password|invitation code/);
 });

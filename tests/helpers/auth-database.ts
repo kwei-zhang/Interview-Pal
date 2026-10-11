@@ -17,7 +17,7 @@ export const authFixture = `create role anon nologin; create role authenticated 
 
 export async function setupAuthDatabase(db: PGlite, bootstrap = true, beforeInviteMigration?: () => Promise<void>) {
   await db.exec(authFixture);
-  for (const file of ["202610100001_foundation.sql", "202610100002_interview_agent.sql", "202610100003_llm_judging.sql", "202610100004_invite_only_users.sql"]) {
+  for (const file of ["202610100001_foundation.sql", "202610100002_interview_agent.sql", "202610100003_llm_judging.sql", "202610100004_invite_only_users.sql", "202610110005_invitation_diagnostics.sql", "202610110006_invitation_auth_rls.sql"]) {
     if (file === "202610100004_invite_only_users.sql") await beforeInviteMigration?.();
     await db.exec(readFileSync(`supabase/migrations/${file}`, "utf8"));
   }

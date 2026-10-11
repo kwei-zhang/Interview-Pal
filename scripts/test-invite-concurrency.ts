@@ -28,7 +28,7 @@ async function main() {
       if (binary === "pg_ctl") started = true;
     }
     let setup = authFixture;
-    for (const file of ["202610100001_foundation.sql", "202610100002_interview_agent.sql", "202610100003_llm_judging.sql", "202610100004_invite_only_users.sql"])
+    for (const file of ["202610100001_foundation.sql", "202610100002_interview_agent.sql", "202610100003_llm_judging.sql", "202610100004_invite_only_users.sql", "202610110005_invitation_diagnostics.sql", "202610110006_invitation_auth_rls.sql"])
       setup += await readFile(`supabase/migrations/${file}`, "utf8");
     setup += await readFile("supabase/bootstrap-admin.sql", "utf8");
     setup += `select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);

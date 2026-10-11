@@ -94,6 +94,78 @@ test("Failed account creation rolls back redemption and leaves the code usable",
   await signup("rollback@example.test", invitation.code);
 });
 
+test("Hook diagnostics identify the failed check without returning signup secrets or consuming a pending invite", async () => {
+  const email = "diagnostics@example.test", invitation = await invite(email);
+  const user = {email, is_anonymous: false, app_metadata: {provider: "email"}, user_metadata: {invite_code: invitation.code}};
+  async function check(overrides: Record<string, unknown>, reason: string) {
+    await asUser(db, null, "supabase_auth_admin");
+    const result = (await db.query<{result: {error: {http_code: number; message: string}}}>(
+      "select public.before_user_created($1) as result", [{user: {...user, ...overrides}}])).rows[0].result;
+    assert.equal(result.error.http_code, 400);
+    assert.equal(result.error.message, `Invitation is invalid or no longer available for this email. [invite:${reason}]`);
+    assert.ok(!result.error.message.includes(email));
+    assert.ok(!result.error.message.includes(invitation.code));
+  }
+  await check({is_anonymous: true}, "anonymous_signup");
+  await check({app_metadata: {}}, "missing_provider");
+  await check({app_metadata: {provider: "google"}}, "unsupported_provider");
+  await check({user_metadata: {}}, "missing_code");
+  await check({email: ""}, "missing_email");
+  await check({user_metadata: {invite_code: "0".repeat(32)}}, "code_not_found");
+  await check({email: "different@example.test"}, "email_mismatch");
+  // Reapplying the diagnostic migration preserves pending invitations and ACLs.
+  await db.exec("reset role");
+  await db.exec(readFileSync("supabase/migrations/202610110005_invitation_diagnostics.sql", "utf8"));
+  assert.deepEqual(await hook(email, invitation.code), {});
+  assert.equal((await db.query<{redeemed_at: string | null}>("select redeemed_at from private.invitations where id=$1", [invitation.id])).rows[0].redeemed_at, null);
+  await asUser(db, null, "anon");
+  await assert.rejects(db.query("select public.before_user_created('{}')"), /permission denied/);
+  await db.exec("reset role");
+  await db.query("update private.invitations set expires_at=now()-interval '1 second' where id=$1", [invitation.id]);
+  await check({}, "expired");
+  await db.exec("reset role");
+  await db.query("update private.invitations set revoked_at=now() where id=$1", [invitation.id]);
+  await check({}, "revoked");
+  await db.exec("reset role");
+  await db.query("update private.invitations set revoked_at=null, expires_at=now()+interval '7 days' where id=$1", [invitation.id]);
+  await signup(email, invitation.code);
+  await check({}, "already_redeemed");
+});
+
+test("Auth can validate invitations with RLS enabled while browser roles cannot read or alter them", async () => {
+  const email = "rls-regression@example.test", invitation = await invite(email);
+  await db.exec("reset role");
+  const before = (await db.query("select * from private.invitations where id=$1", [invitation.id])).rows[0];
+  // Reproduce the hosted configuration: a table SELECT grant with no RLS policy.
+  await db.exec("drop policy invitations_auth_lookup on private.invitations");
+  try {
+    assert.match((await hook(email, invitation.code)).error!.message, /\[invite:code_not_found\]/);
+    assert.equal((await db.query("select * from private.invitations")).rows.length, 0);
+  } finally {
+    await db.exec("reset role");
+    await db.exec(readFileSync("supabase/migrations/202610110006_invitation_auth_rls.sql", "utf8"));
+  }
+  // The forward repair is idempotent and does not replace or consume any code.
+  await db.exec(readFileSync("supabase/migrations/202610110006_invitation_auth_rls.sql", "utf8"));
+  assert.deepEqual((await db.query("select * from private.invitations where id=$1", [invitation.id])).rows[0], before);
+  assert.equal((await db.query<{enabled: boolean}>("select relrowsecurity as enabled from pg_class where oid='private.invitations'::regclass")).rows[0].enabled, true);
+  assert.deepEqual(await hook(email, invitation.code), {});
+  assert.match((await hook("wrong@example.test", invitation.code)).error!.message, /email_mismatch/);
+  await assert.rejects(db.query("update private.invitations set expires_at=now()"), /permission denied/);
+  // Check RLS itself in addition to the existing table permission restrictions.
+  await db.exec("reset role; grant usage on schema private to anon; grant select on private.invitations to anon, authenticated");
+  try {
+    for (const [id, role] of [[null, "anon"], [memberId, "authenticated"], [adminId, "authenticated"]] as const) {
+      await asUser(db, id, role);
+      assert.equal((await db.query("select * from private.invitations")).rows.length, 0);
+    }
+  } finally {
+    await db.exec("reset role; revoke usage on schema private from anon; revoke select on private.invitations from anon, authenticated");
+  }
+  await signup(email, invitation.code);
+  assert.match((await hook(email, invitation.code)).error!.message, /already_redeemed/);
+});
+
 test("Suspension blocks existing JWT identities, data, and quotas; restoration preserves work", async () => {
   await asUser(db, memberId);
   await db.query("insert into public.profiles(user_id,data) values ($1,$2)", [memberId, {displayName: "Private member", reflection: "Never shown to admins"}]);
