@@ -10,7 +10,10 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && node node_modules/typescript/bin/tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:auth": "playwright test --config playwright.auth.config.ts",
+    "test:auth:server": "npm run build && next start --hostname 127.0.0.1 --port 3102",
+    "test:invite-concurrency": "node --import tsx scripts/test-invite-concurrency.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

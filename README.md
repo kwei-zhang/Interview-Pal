@@ -11,7 +11,8 @@ A private interview preparation workspace built with Next.js, TypeScript, Tailwi
 - STAR stories with reflections, competency tags, and links to multiple questions. Twenty original behavioral questions.
 - Coding and behavioral interview rooms, timers, microphone preflight, live voice input/playback, typed responses, scratchpads, ordered transcripts, interrupted-session resume, and saved reviews.
 - An OpenAI interviewer that answers clarification questions using the authored problem specification, recent conversation, current language/code, and supplied test results. Typed chat uses the Responses API; live voice uses Realtime WebRTC with automatic turn detection and interruptions. AI reviews contain evidence and descriptive evaluation dimensions.
-- Responsive preparation/review pages, light/dark themes, private email/password login, and workspace/transcript exports.
+- Responsive preparation/review pages, light/dark themes, invite-only email/password accounts, and workspace/transcript exports.
+- Single-use invitations tied to email, verification and password recovery, and admin invitation/access management. Privileges bind to an explicitly designated Auth user ID.
 
 Interview Pal does not store raw audio. Live voice sends audio directly to OpenAI over WebRTC; conversation context and review requests are also sent to OpenAI. AI answers and feedback can be incorrect; inspect the saved evidence.
 
@@ -28,23 +29,32 @@ Open http://127.0.0.1:3000. Without Supabase variables, development on localhost
 
 Monaco assets are copied from the installed dependency to `public/vendor/monaco` during install/build, so the editor does not depend on a CDN. The plain editor toggle offers an accessible textarea and works well on mobile.
 
-## Configure Supabase and your private account
+## Configure Supabase and invite-only accounts
 
-1. Create a Supabase project. In its SQL Editor run the three files in `supabase/migrations` in filename order, then `supabase/seed.sql`. For an existing project, apply `202610100003_llm_judging.sql` to retire catalog test suites while preserving personal work. Each migration runs once; the seed can be rerun to update catalogs.
-2. In Authentication settings, disable **Allow new users to sign up**. The local Supabase configuration already has `enable_signup = false`; a hosted project must be configured separately.
-3. In Authentication → Users, create your own user with an email and password and mark the email confirmed. The app intentionally has no signup page.
-4. Copy `.env.example` to `.env.local` and fill these values from your project's **Connect** dialog:
+1. Keep **Allow new users to sign up** disabled during setup. Apply migrations 001–003 and the seed if they have not already been applied. Preserve current Auth accounts and workspace data.
+2. Ensure your own verified email/password account already exists. For a fresh project, provision **zhangkw0622@gmail.com** in Authentication → Users before applying migration 004. A database reset creates no privileged user automatically; provision the designated account before migration 004 in that environment too.
+3. Apply `supabase/migrations/202610100004_invite_only_users.sql`. Existing accounts become ordinary members; invitation enforcement and active membership policies take effect. Then run `supabase/bootstrap-admin.sql` separately. It resolves **zhangkw0622@gmail.com** to exactly one verified, non-anonymous Auth user and grants that UUID admin access. It fails without granting access if the account is missing, unverified, or ambiguous. Admin access never comes from a first signup or profile fields. For a different installation, explicitly change the designated account in this setup file before running it.
+4. In Authentication → Hooks, enable **Before User Created**, choose Postgres, and select `public.before_user_created`. The database signup trigger also enforces invitations if this hook is misconfigured. Hook checks do not consume codes; account creation and redemption commit together. See [Supabase Auth hooks](https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook).
+5. Configure [custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp) in Supabase for confirmation/recovery emails. The default mail service only sends to project team addresses. Set Supabase's Site URL and `AUTH_SITE_URL` to your actual website origin (for example, `http://127.0.0.1:3001` locally, HTTPS in production), and allow that origin's `/auth/confirm` redirect.
+6. Replace the **Confirm signup** and **Reset password** email templates with `supabase/templates/confirmation.html` and `supabase/templates/recovery.html`. They send users to an explicit confirmation button, so a mail scanner's GET does not consume the token. Enable **Confirm email**, set minimum password length to **12**, retain Supabase Auth rate limits, and set the email resend interval to at least 60 seconds. No verification/recovery email should contain an invitation code.
+7. After the migration, admin binding, hook, and email configuration are ready, enable email/password signup. Keep anonymous sign-ins, phone, and OAuth providers disabled. Registration is now gated by database invitation checks. Local settings and templates are in `supabase/config.toml`; hosted settings must be configured separately.
+8. Copy `.env.example` to `.env.local` and fill these values:
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_KEY
+AUTH_SITE_URL=http://127.0.0.1:3001
 ```
 
 The second variable accepts a current `sb_publishable_…` key or a legacy `anon` key. Never put `sb_secret_…` or `service_role` credentials in a public variable. No service-role key is required. See [Supabase's key documentation](https://supabase.com/docs/guides/api/api-keys).
 
-Restart the Next.js server after changing environment variables. Sign in at `/login`. Personal tables have owner-scoped row-level security; anonymous accounts cannot access them. Catalogs are readable by authenticated users. Story/link and session/event/feedback writes use atomic database functions. Workspace updates are optimistic, with visible save errors and retry; pending changes use a best-effort unload beacon.
+Restart Next.js after changing environment variables. Sign in at `/login`. The designated admin sees **Administration** in the sidebar. Create an invitation for a recipient email and copy the code immediately; only its hash is stored. Share it manually and direct the recipient to `/signup`. Codes expire after seven days and are consumed when the unverified account is created. Verification resends and password recovery need no new invitation. Replacing an unused invitation revokes the old one; existing accounts use verification resend/recovery instead of a second registration.
 
-To use the Supabase CLI instead of the SQL Editor, install the CLI separately, link your project, push migrations, and apply `supabase/seed.sql`. Review CLI target/project selection before changing a remote database.
+Admins can list account identity/access details and suspend or restore ordinary members. Admins cannot change roles in the website or read another user's drafts, stories, transcripts, or feedback. Suspension denies subsequent API and database access, including existing JWTs. Already-established provider voice connections are not forcibly terminated at the provider. The browser checks membership on focus and every 30 seconds and closes its room when access is lost. Logout and password recovery remain available to suspended accounts.
+
+Personal tables retain owner-scoped RLS plus verified, active membership checks. Catalogs also require active membership. Workspace reads/writes (including unload beacons) and agent/admin requests bind to the user ID captured when the page loaded. Another tab signing in clears old state; stale requests cannot save into the new account. Cloud content never enters the localhost demo's browser storage. Story/link and session/event/feedback writes remain atomic, with visible save errors and retry for network failures.
+
+To use the Supabase CLI, install it separately, link the intended project, and push unapplied migrations. Provision the designated account before migration 004 on a fresh database. Apply the separate bootstrap SQL explicitly, then configure the hosted Auth hook and email settings. Never enable signup first. If rollout fails, disable signup again and preserve membership/invitation tables and personal data while fixing configuration.
 
 ## Interview code verification
 
@@ -109,6 +119,9 @@ Adding a role means seeding a role track and collections and registering its mod
 npm run typecheck
 npm test
 npm run test:e2e
+npm run test:auth
+# Optional real-PostgreSQL race test; requires initdb, pg_ctl, and psql on PATH:
+npm run test:invite-concurrency
 npm run build
 ```
 
@@ -116,10 +129,43 @@ Regression tests validate all 450 starter declarations, LLM plan parsing, immuta
 
 Browser tests use installed Google Chrome via Playwright. They start a separate development server on port 3100 with cloud variables overridden empty. They cover preparation, stories, completed/interrupted sessions, saved reviews, unavailable execution, responsive navigation, themes, and API origin checks. Install Chrome or adjust `playwright.config.ts` to your browser. Test reports/traces and local credentials are ignored by Git.
 
+`test:auth` builds and runs a separate production app on port 3102 with a test-only Supabase HTTP fixture on 54329. It exercises real SQL migrations/RLS in PGlite while substituting Auth password/verification delivery. It covers admin invites, verified signup, private draft persistence, suspension, recovery, stale cross-account saves/beacons, and expired links. No real accounts are created and no email is sent. Database tests also cover direct insertion bypasses, secret scrubbing, rollback, role escalation, and owner isolation. The concurrency script creates and removes its own temporary PostgreSQL cluster and races two independent connections against one invitation.
+
+Before deployment, exercise one real invitation through confirmation email and one real password reset in your configured Supabase project. Fixture tests do not validate hosted SMTP delivery or dashboard hook configuration. Operational application logs omit passwords, invite codes, and Auth tokens; do not enable request-body logging on auth routes, and redact confirmation URL query strings in infrastructure logs.
+
 Regression fixtures run locally; user Python code runs only in OpenAI Code Interpreter. Fixture tests do not establish live model/tool access; verify a real interview code check after configuring your API key.
 
 ## Deploy to Vercel
 
-Import this repository as a Next.js project, use `npm run build`, and configure the Supabase and OpenAI environment variables in Vercel. Apply database migration/seed and provision your user before launch. Set Supabase's site URL to your deployment's HTTPS origin. Login uses passwords and has no OAuth callback route.
+Import this repository as a Next.js project, use `npm run build`, and configure Supabase, OpenAI, and `AUTH_SITE_URL` in Vercel. Complete the invitation migration, explicit admin binding, Auth hook, SMTP, and confirmation/recovery templates before enabling email signup. Set Supabase’s Site URL to the same HTTPS origin. Keep alternative signup providers disabled.
 
 Production requires Supabase and otherwise displays a setup page. Operational error logs contain classifications and session/job identifiers, not stories, source code, transcript text, or credentials. Reviews persist completed and interrupted sessions separately. The OpenAI adapter is implemented; manual spoken-session verification on your target browser is still required before release.
+
+### Serve Interview Pal at `https://www.kwei.me/interview`
+
+`https://kwei.me` currently redirects to `https://www.kwei.me`, so use the canonical `www` origin for auth settings.
+
+Use two Vercel projects: the existing `kwei-zhang/ZJN` website continues to own `kwei.me`; `kwei-zhang/Interview-Pal` serves the interview application. The website forwards only `/interview` and its nested paths to the app. Do not transfer the custom domain to the Interview Pal project.
+
+1. Commit and push the latest Interview Pal source to `kwei-zhang/Interview-Pal`. Keep `.env.local` and `.next*` build directories out of Git.
+2. In Vercel, choose **Add New → Project**, import `kwei-zhang/Interview-Pal`, select Next.js, and use Node.js 22.x with `npm run build` (leave the output directory at its framework default).
+3. Set the app project's Production environment variables before deploying:
+
+   | Variable | Value |
+   | --- | --- |
+   | `NEXT_PUBLIC_BASE_PATH` | `/interview` |
+   | `AUTH_SITE_URL` | `https://www.kwei.me/interview` |
+   | `NEXT_PUBLIC_SUPABASE_URL` | Existing project URL from `.env.local` |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Existing publishable/anon key from `.env.local` |
+   | `OPENAI_API_KEY` | Existing server-only API key from `.env.local` |
+   | `OPENAI_INTERVIEW_MODEL` | Existing model value from `.env.local` |
+   | `OPENAI_REALTIME_MODEL` | Existing model value from `.env.local` |
+
+4. Deploy. Copy the stable production `.vercel.app` domain shown under the Interview Pal project's Settings → Domains. Visit `https://YOUR-APP.vercel.app/interview/login`; the app now lives under `/interview` even on this upstream domain. Keep Fluid Compute enabled: the interviewer route allows up to 210 seconds for code verification. The upstream production deployment must be reachable by the main website's rewrite; check deployment protection if it returns a Vercel authentication page.
+5. In the **existing ZJN website project**, add `INTERVIEW_APP_ORIGIN=https://YOUR-APP.vercel.app` to Production environment variables. This value is the upstream origin only, with no `/interview` suffix. Copy `deployment/kwei-next.config.example.ts` from this repo into that website's `next.config.ts`, preserving any other settings. The current local ZJN config is empty. Commit/push the website config, or redeploy after setting the variable. These routing rules belong in ZJN, not Interview Pal. Use a plain `<a href="/interview">Interview practice</a>` for any homepage link across the two applications.
+6. In Supabase Authentication → URL Configuration, set **Site URL** to `https://www.kwei.me/interview` and add **Redirect URL** `https://www.kwei.me/interview/auth/confirm`. Keep the confirmation and recovery templates from `supabase/templates`; they append `/auth/confirm` to Site URL. Account records, database migrations, passwords, and invitation codes do not need to be recreated. Once Site URL changes, these email templates send even local test requests to the deployed site; use a separate Supabase project when independent local email testing is needed.
+7. Open `https://www.kwei.me/interview/login` and sign in with your existing account. Verify homepage access, saved drafts after reload, Monaco loading, invitations, password recovery, and a complete spoken interview before sharing the link. Check the URL stays under `/interview` after login, logout, and email confirmation.
+
+`NEXT_PUBLIC_BASE_PATH` is a build-time setting: rebuild/redeploy after changing it. Leave it unset or empty in local `.env.local` to keep `http://127.0.0.1:3001` working as before. Native Next.js links handle the prefix; app fetches, browser redirects, public editor assets, auth email URLs, and auth cookie paths explicitly honor it. Origin checks accept the configured HTTPS public origin behind Vercel's rewrite without trusting arbitrary forwarded-host headers. Private workspace/admin responses remain uncached.
+
+Run `TEST_BASE_PATH=/interview npm run test:auth` to exercise the production build, account flows, cookie scope, drafts, and editor assets under the prefix using the isolated Supabase fixture. `npm run test:auth` checks the original root deployment. The fixture does not test the live Vercel routing or hosted email delivery.

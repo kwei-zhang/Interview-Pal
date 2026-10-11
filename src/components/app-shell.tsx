@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown, CircleHelp, Code2, History, LayoutDashboard, Menu, Moon, Settings2, Sparkles, Sun, X, CloudOff, RefreshCw } from "lucide-react";
+import { ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown, CircleHelp, Code2, History, LayoutDashboard, Menu, Moon, Settings2, Sparkles, Sun, X, CloudOff, RefreshCw, LockKeyhole } from "lucide-react";
 import { useWorkspace } from "./workspace-provider";
 import { LoadingState } from "./ui";
 
@@ -14,7 +14,7 @@ const navigation = [
   {href: "/interviews", label: "Mock interviews", icon: AudioLines},
   {href: "/history", label: "Session history", icon: History},
 ];
-export function AppShell({children, email}: {children: React.ReactNode; email?: string}) {
+export function AppShell({children, email, admin = false}: {children: React.ReactNode; email?: string; admin?: boolean}) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dark, setDark] = useState(false);
@@ -26,7 +26,7 @@ export function AppShell({children, email}: {children: React.ReactNode; email?: 
   }, []);
   useEffect(() => { setMobileOpen(false); }, [pathname]);
   const toggleTheme = () => { const value = !dark; setDark(value); localStorage.setItem("interview-pal.theme", value ? "dark" : "light"); document.documentElement.dataset.theme = value ? "dark" : "light"; };
-  const section = navigation.find(n => n.href === "/" ? pathname === "/" : pathname.startsWith(n.href))?.label || "Settings";
+  const section = navigation.find(n => n.href === "/" ? pathname === "/" : pathname.startsWith(n.href))?.label || (pathname === "/admin" ? "Administration" : "Settings");
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">Skip to content</a>
     {mobileOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)}/>}
@@ -37,6 +37,7 @@ export function AppShell({children, email}: {children: React.ReactNode; email?: 
       <div className="nav-label">YOUR PRACTICE SPACE</div>
       <nav aria-label="Main navigation">{navigation.map(({href, label, icon: Icon}) => <Link key={href} href={href} className={`nav-item ${(href === "/" ? pathname === "/" : pathname.startsWith(href)) ? "active" : ""}`}><Icon size={18}/><span>{label}</span>{href === "/coding" && <span className="nav-count">150</span>}</Link>)}</nav>
       <div className="sidebar-bottom">
+        {admin && <Link href="/admin" className={`nav-item ${pathname === "/admin" ? "active" : ""}`}><LockKeyhole size={18}/>Administration</Link>}
         <div className="sidebar-note"><Sparkles size={18}/><strong>Small steps. Strong answers.</strong><p>A little deliberate practice goes a long way.</p><Link href="/interviews">Start a session<ArrowUpRight size={15}/></Link></div>
         <Link href="/settings" className={`nav-item ${pathname === "/settings" ? "active" : ""}`}><Settings2 size={18}/>Settings</Link>
         <a href="https://neetcode.io/roadmap" target="_blank" rel="noreferrer" className="nav-item"><CircleHelp size={18}/>NeetCode roadmap<ArrowUpRight size={14}/></a>

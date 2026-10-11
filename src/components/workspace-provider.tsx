@@ -1,8 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { appPath } from "@/lib/paths";
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { applyMutation, emptyWorkspace, type WorkspaceData, type WorkspaceMutation, type Attempt, type ProblemProgress } from "@/lib/types";
+import { AUTH_CHANGE_KEY } from "@/lib/auth";
+import { createAccountFetch } from "@/lib/account-client";
 
 export const LOCAL_STORAGE_KEY = "interview-pal.workspace.v1";
 type SyncState = "loading" | "saved" | "saving" | "error";
@@ -15,6 +19,8 @@ interface WorkspaceContextValue {
   progressFor: (id: string) => ProblemProgress;
   notify: (message: string) => void;
   notice: string;
+  userId?: string;
+  accountFetch: typeof fetch;
 }
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 function mutationKey(m: WorkspaceMutation): string {
@@ -25,7 +31,7 @@ function mutationKey(m: WorkspaceMutation): string {
   if (m.kind === "session") return `session:${m.value.id}`;
   return `${m.kind === "delete-story" ? "story" : "session"}:${m.id}`;
 }
-export function WorkspaceProvider({mode, children}: {mode: "demo" | "cloud"; children: React.ReactNode}) {
+export function WorkspaceProvider({mode, userId, children}: {mode: "demo" | "cloud"; userId?: string; children: React.ReactNode}) {
   const [data, setData] = useState<WorkspaceData>(emptyWorkspace);
   const dataRef = useRef(data);
   const [ready, setReady] = useState(false);
@@ -38,6 +44,30 @@ export function WorkspaceProvider({mode, children}: {mode: "demo" | "cloud"; chi
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pathname = usePathname();
   const previousPath = useRef(pathname);
+  const active = useRef(true);
+  const loseAccess = useCallback(() => {
+    if (!active.current) return;
+    active.current = false;
+    pending.current.clear();
+    if (timer.current) clearTimeout(timer.current);
+    dataRef.current = emptyWorkspace(); setData(dataRef.current); setReady(false);
+    window.location.replace(appPath("/login?notice=account-changed"));
+  }, []);
+  const accountFetch = useMemo(() => createAccountFetch(userId, loseAccess), [userId, loseAccess]);
+  useEffect(() => {
+    active.current = true;
+    if (mode !== "cloud") return;
+    const check = () => {if (active.current) void accountFetch("/api/auth/me").catch(() => {});};
+    const storage = (event: StorageEvent) => {if (event.key === AUTH_CHANGE_KEY) loseAccess();};
+    const interval = setInterval(check, 30000);
+    window.addEventListener("storage", storage); window.addEventListener("focus", check); window.addEventListener("pageshow", check);
+    return () => {
+      active.current = false;
+      clearInterval(interval); if (timer.current) clearTimeout(timer.current);
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      window.removeEventListener("storage", storage); window.removeEventListener("focus", check); window.removeEventListener("pageshow", check);
+    };
+  }, [mode, accountFetch, loseAccess]);
   const notify = useCallback((message: string) => {
     setNotice(message);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -47,7 +77,7 @@ export function WorkspaceProvider({mode, children}: {mode: "demo" | "cloud"; chi
     try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next)); setSyncState("saved"); setError(""); }
     catch { setSyncState("error"); setError("Your browser could not save changes. Export your workspace before closing this tab."); }
   }, []);
-  const commit = useCallback((next: WorkspaceData) => { dataRef.current = next; setData(next); if (mode === "demo") persistLocal(next); }, [mode, persistLocal]);
+  const commit = useCallback((next: WorkspaceData) => { if (!active.current) return; dataRef.current = next; setData(next); if (mode === "demo") persistLocal(next); }, [mode, persistLocal]);
   const load = useCallback(async () => {
     setSyncState("loading");
     try {
@@ -57,26 +87,28 @@ export function WorkspaceProvider({mode, children}: {mode: "demo" | "cloud"; chi
         loaded = raw ? JSON.parse(raw) : emptyWorkspace();
         if (!loaded.profile || !loaded.progress || !loaded.drafts || !Array.isArray(loaded.stories) || !Array.isArray(loaded.sessions) || !Array.isArray(loaded.attempts)) throw new Error("Your saved local workspace could not be read. Restore a backup or clear this site's storage to start again.");
       } else {
-        const response = await fetch("/api/workspace", {cache: "no-store"});
+        const response = await accountFetch("/api/workspace");
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Could not load your workspace.");
         loaded = body;
       }
+      if (!active.current) return;
       dataRef.current = loaded; setData(loaded); setReady(true); setError(""); setSyncState("saved");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not load the workspace."); setSyncState("error"); }
-  }, [mode]);
+  }, [mode, accountFetch]);
   useEffect(() => { void load(); }, [load]);
 
   const flush = useCallback(async (): Promise<boolean> => {
     if (mode === "demo") return true;
+    if (!active.current) return false;
     if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     if (inFlight.current) return inFlight.current;
     const work = async () => {
       setSyncState("saving");
-      while (pending.current.size) {
+      while (active.current && pending.current.size) {
         const [key, mutation] = pending.current.entries().next().value!;
         try {
-          const response = await fetch("/api/workspace", {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify(mutation)});
+          const response = await accountFetch("/api/workspace", {method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify({userId, mutation})});
           if (!response.ok) { const body = await response.json(); throw new Error(body.error || "Could not save changes."); }
           // A newer edit may have replaced the mutation while this request ran.
           if (pending.current.get(key) === mutation) pending.current.delete(key);
@@ -84,12 +116,14 @@ export function WorkspaceProvider({mode, children}: {mode: "demo" | "cloud"; chi
           setSyncState("error"); setError(e instanceof Error ? e.message : "Could not save changes."); return false;
         }
       }
+      if (!active.current) return false;
       setSyncState("saved"); setError(""); return true;
     };
     const promise = work(); inFlight.current = promise;
     try { return await promise; } finally { inFlight.current = null; }
-  }, [mode]);
+  }, [mode, userId, accountFetch]);
   const mutate = useCallback((mutation: WorkspaceMutation) => {
+    if (!active.current) return;
     commit(applyMutation(dataRef.current, mutation));
     if (mode === "cloud") {
       pending.current.set(mutationKey(mutation), mutation);
@@ -112,6 +146,7 @@ export function WorkspaceProvider({mode, children}: {mode: "demo" | "cloud"; chi
   }, [pathname, mutate]);
   useEffect(() => {
     const onPageHide = () => {
+      if (!active.current) return;
       const session = dataRef.current.sessions.find(s => s.status === "active" && pathname === `/interviews/${s.id}`);
       if (session) {
         const value = {...session, status: "interrupted" as const, lastActiveAt: new Date().toISOString()};
@@ -121,16 +156,16 @@ export function WorkspaceProvider({mode, children}: {mode: "demo" | "cloud"; chi
       }
       if (mode === "cloud") {
         // Small independent beacons preserve outstanding changes on tab close.
-        for (const mutation of pending.current.values()) navigator.sendBeacon("/api/workspace/beacon", new Blob([JSON.stringify(mutation)], {type: "application/json"}));
+        for (const mutation of pending.current.values()) navigator.sendBeacon(appPath("/api/workspace/beacon"), new Blob([JSON.stringify({userId, mutation})], {type: "application/json"}));
       }
     };
     const onBeforeUnload = (event: BeforeUnloadEvent) => { if (mode === "cloud" && pending.current.size) { event.preventDefault(); } };
     window.addEventListener("pagehide", onPageHide); window.addEventListener("beforeunload", onBeforeUnload);
     return () => { window.removeEventListener("pagehide", onPageHide); window.removeEventListener("beforeunload", onBeforeUnload); };
-  }, [mode, pathname]);
+  }, [mode, pathname, userId]);
   const progressFor = useCallback((id: string): ProblemProgress => data.progress[id] || {problemId: id, status: "not-started", reviewLater: false, notes: "", updatedAt: new Date().toISOString()}, [data.progress]);
   const retry = useCallback(() => { if (!ready) void load(); else void flush(); }, [ready, load, flush]);
-  return <WorkspaceContext.Provider value={{data, ready, mode, syncState, error, mutate, flush, retry, addAttempt, progressFor, notify, notice}}>{children}</WorkspaceContext.Provider>;
+  return <WorkspaceContext.Provider value={{data, ready, mode, syncState, error, mutate, flush, retry, addAttempt, progressFor, notify, notice, userId, accountFetch}}>{children}</WorkspaceContext.Provider>;
 }
 export function useWorkspace() {
   const context = useContext(WorkspaceContext);

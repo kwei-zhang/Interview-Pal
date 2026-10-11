@@ -16,7 +16,7 @@ import { CodingWorkspace } from "./coding-workspace";
 function formatTime(seconds: number) {return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;}
 export function InterviewRoom({id}: {id: string}) {
   const router = useRouter();
-  const {data, mutate, flush, addAttempt} = useWorkspace();
+  const {data, mutate, flush, addAttempt, accountFetch} = useWorkspace();
   const flushRef = useRef(flush); flushRef.current = flush;
   const session = data.sessions.find(s => s.id === id);
   const sessionRef = useRef(session); sessionRef.current = session;
@@ -40,7 +40,7 @@ export function InterviewRoom({id}: {id: string}) {
   useEffect(() => {
     const current = sessionRef.current;
     if (!current || current.status === "completed") return;
-    const adapter: InterviewAgentAdapter = new OpenAIInterviewAgent(); adapterRef.current = adapter;
+    const adapter: InterviewAgentAdapter = new OpenAIInterviewAgent(accountFetch); adapterRef.current = adapter;
     let active = true;
     setError(""); setCaption(""); setLiveVoice(false);
     setVoiceAvailable(adapter.voice.available);
@@ -67,7 +67,7 @@ export function InterviewRoom({id}: {id: string}) {
       if (active && sessionRef.current?.status === "active") adapter.connectVoice(setListening, setError);
     })().catch(error => {if (active) {setError(error instanceof Error ? error.message : "The interviewer could not connect."); setInterviewerState("disconnected");}});
     return () => {active = false; adapter.dispose(); unsubscribe(); if (adapterRef.current === adapter) adapterRef.current = null;};
-  }, [id, updateSession, addAttempt]);
+  }, [id, updateSession, addAttempt, accountFetch]);
   useEffect(() => {
     const current = sessionRef.current;
     if (!current || current.status === "completed") return;

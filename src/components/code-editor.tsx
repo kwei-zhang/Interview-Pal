@@ -1,11 +1,13 @@
 "use client";
 
+import { appPath } from "@/lib/paths";
+
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { loader } from "@monaco-editor/react";
 import type { Language } from "@/lib/types";
 
-loader.config({paths: {vs: "/vendor/monaco/vs"}});
+loader.config({paths: {vs: appPath("/vendor/monaco/vs")}});
 const Monaco = dynamic(() => import("@monaco-editor/react").then(module => module.default), {ssr: false});
 export function CodeEditor({value, language, onChange}: {value: string; language: Language; onChange: (value: string) => void}) {
   const [plain, setPlain] = useState(false);

@@ -1,3 +1,4 @@
+import { appFetch } from "../paths";
 import { problemById } from "../data/catalog";
 import { questionById } from "../data/behavioral";
 import type { Attempt, InterviewSession, TranscriptEvent } from "../types";
@@ -21,7 +22,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
   private retryText?: string;
   private openingRequested = false;
   private verificationPending?: Promise<unknown>;
-  constructor(private fetcher: typeof fetch = (...args) => fetch(...args)) {
+  constructor(private fetcher: typeof fetch = appFetch) {
     this.voice = new RealtimeVoiceTransport(async (sdp, signal) => {
       const result = await this.request("voice", signal, sdp);
       if (typeof result.sdp !== "string") throw new Error("Voice connection could not be read.");

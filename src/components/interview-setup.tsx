@@ -12,7 +12,7 @@ import { Badge, PageHeading, prettyLanguage } from "./ui";
 
 export function InterviewSetup() {
   const router = useRouter();
-  const {data, mutate, flush} = useWorkspace();
+  const {data, mutate, flush, accountFetch} = useWorkspace();
   const [type, setType] = useState<InterviewType>("coding");
   const [topic, setTopic] = useState("");
   const [questionId, setQuestionId] = useState(interviewModules.coding.questions[0].id);
@@ -26,11 +26,11 @@ export function InterviewSetup() {
   const [checkingAgent, setCheckingAgent] = useState(true);
   useEffect(() => {
     let active = true;
-    fetch("/api/config").then(r => r.json()).then(body => {
+    accountFetch("/api/config").then(r => r.json()).then(body => {
       if (active) setAgentConfigured(Boolean(body.agentConfigured));
     }).catch(() => {}).finally(() => {if (active) setCheckingAgent(false);});
     return () => {active = false;};
-  }, []);
+  }, [accountFetch]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const selected: InterviewType = params.get("type") === "behavioral" ? "behavioral" : "coding";

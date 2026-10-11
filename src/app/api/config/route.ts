@@ -1,10 +1,10 @@
 import { headers } from "next/headers";
-import { requireUser, supabaseConfigured } from "@/lib/server/supabase";
+import { assertAccountBinding, requireUser, supabaseConfigured } from "@/lib/server/supabase";
 import { errorResponse, HttpError } from "@/lib/server/http";
 import { openAIConfig } from "@/lib/server/openai-interviewer";
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    if (supabaseConfigured()) await requireUser();
+    if (supabaseConfigured()) { const {user} = await requireUser(); assertAccountBinding(request.headers.get("x-workspace-user-id"), user.id); }
     else {
       const host = (await headers()).get("host")?.split(":")[0];
       if (process.env.NODE_ENV !== "development" || (host !== "localhost" && host !== "127.0.0.1")) throw new HttpError(401, "Sign in to view workspace configuration.");

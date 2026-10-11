@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { assertSameOrigin, errorResponse, HttpError, readJson } from "@/lib/server/http";
-import { requireUser, supabaseConfigured } from "@/lib/server/supabase";
+import { assertAccountBinding, requireUser, supabaseConfigured } from "@/lib/server/supabase";
 import { agentRequestSchema, callInterviewer } from "@/lib/server/openai-interviewer";
 
 export const maxDuration = 210;
@@ -9,6 +9,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const auth = supabaseConfigured() ? await requireUser() : undefined;
+    if (auth) assertAccountBinding(request.headers.get("x-workspace-user-id"), auth.user.id);
     if (!auth) {
       const host = (await headers()).get("host")?.split(":")[0];
       if (process.env.NODE_ENV !== "development" || (host !== "localhost" && host !== "127.0.0.1")) throw new HttpError(401, "Sign in to use the AI interviewer.");

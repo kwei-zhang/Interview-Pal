@@ -1,6 +1,8 @@
 node_modules/
 .next/
 .next-e2e/
+.next-auth-e2e/
+.next-auth-path-e2e/
 .next-preview/
 next-env.d.ts
 .env*

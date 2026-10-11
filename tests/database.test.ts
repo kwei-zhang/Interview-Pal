@@ -2,6 +2,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
+import { authFixture } from "./helpers/auth-database";
 
 const owner = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";
@@ -14,16 +15,13 @@ async function signIn(user: string | null, role = "authenticated") {
   await db.exec(`set role ${role}`);
 }
 before(async () => {
-  await db.exec(`create role anon nologin; create role authenticated nologin; create schema auth;
-    grant usage on schema auth to anon, authenticated;
-    create table auth.users(id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
-    insert into auth.users values ('${owner}'), ('${other}');`);
+  await db.exec(authFixture);
   await db.exec(readFileSync("supabase/migrations/202610100001_foundation.sql", "utf8"));
   await db.exec(readFileSync("supabase/migrations/202610100002_interview_agent.sql", "utf8"));
   await db.exec(readFileSync("supabase/seed.sql", "utf8"));
   await db.exec("update public.problem_definitions set data = data || '{\"tests\":[{\"name\":\"public example\",\"args\":[],\"expected\":0,\"example\":true},{\"name\":\"retired case\",\"args\":[],\"expected\":1}]}'::jsonb where problem_id='contains-duplicate'");
   await db.exec(readFileSync("supabase/migrations/202610100003_llm_judging.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migrations/202610100004_invite_only_users.sql", "utf8"));
 });
 after(async () => {await db.close();});
 

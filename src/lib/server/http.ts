@@ -1,10 +1,10 @@
 import { ZodError } from "zod";
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string) { super(message); }
 }
 export function errorResponse(error: unknown): Response {
-  if (error instanceof HttpError) return Response.json({error: error.message}, {status: error.status});
+  if (error instanceof HttpError) return Response.json({error: error.message, ...(error.code ? {code: error.code} : {})}, {status: error.status, headers: {"Cache-Control": "no-store"}});
   if (error instanceof ZodError) return Response.json({error: error.issues[0]?.message || "Invalid request."}, {status: 400});
   // Log only classification, not query payloads, credentials, or transcript text.
   console.error(JSON.stringify({event: "request_failed", errorType: error instanceof Error ? error.name : "unknown"}));
@@ -15,7 +15,14 @@ export function assertSameOrigin(request: Request): void {
   const url = new URL(request.url);
   // Next can normalize request.url to localhost while preserving the browser's Host.
   const host = request.headers.get("host") || url.host;
-  if (!origin || origin !== `${url.protocol}//${host}`) throw new HttpError(403, "This request must come from the Interview Pal website.");
+  // An external Vercel rewrite can use the upstream Host. Trust only our
+  // configured public HTTPS origin, never arbitrary forwarded-host headers.
+  let publicOrigin: string | undefined;
+  try {
+    const configured = new URL(process.env.AUTH_SITE_URL || "");
+    if (configured.protocol === "https:") publicOrigin = configured.origin;
+  } catch { /* Unconfigured local preview still uses the request origin. */ }
+  if (!origin || (origin !== `${url.protocol}//${host}` && origin !== publicOrigin)) throw new HttpError(403, "This request must come from the Interview Pal website.");
 }
 export async function readJson(request: Request, maxBytes = 500000): Promise<unknown> {
   const declared = Number(request.headers.get("content-length") || 0);
