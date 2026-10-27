@@ -17,3 +17,7 @@
 .admin-new-code{padding:24px;margin:20px 0;border-color:var(--purple)}.admin-new-code p{font-size:12px;color:var(--muted);margin:12px 0}.admin-code-heading{display:flex;justify-content:space-between;gap:14px;align-items:center}.admin-code-heading h2{font-size:15px;overflow-wrap:anywhere}.admin-code-copy{display:flex;gap:12px}.admin-code-copy input{font-family:monospace;min-width:0}.admin-code-copy button{white-space:nowrap}
 .admin-table{overflow-x:auto}.admin-table td{font-size:12px;white-space:nowrap}.admin-email{display:block;color:var(--muted);font-size:11px}.admin-empty{padding:30px;color:var(--muted);font-size:12px}.admin-pagination{display:flex;justify-content:flex-end;gap:15px;align-items:center;margin-top:18px;font-size:12px;color:var(--muted)}
 @media(max-width:720px){.admin-invite-form{flex-direction:column;align-items:stretch;padding:18px}.admin-code-copy{flex-direction:column}.admin-new-code{padding:18px}}
+
+.problem-progress {position:relative;display:inline-flex;width:120px}
+.problem-progress .status-select {appearance:none;height:30px;padding:7px 32px 7px 12px!important;line-height:1.4;border-radius:8px}
+.problem-progress>svg {position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none}
