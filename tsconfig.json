@@ -9,6 +9,8 @@
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -41,7 +43,9 @@
     ".next-auth-e2e/types/**/*.ts",
     ".next-auth-e2e/dev/types/**/*.ts",
     ".next-auth-path-e2e/types/**/*.ts",
-    ".next-auth-path-e2e/dev/types/**/*.ts"
+    ".next-auth-path-e2e/dev/types/**/*.ts",
+    ".next-path-e2e/types/**/*.ts",
+    ".next-path-e2e/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

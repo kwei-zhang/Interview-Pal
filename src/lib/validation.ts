@@ -10,15 +10,15 @@ const uuid = z.uuid();
 const problemId = z.string().max(100).regex(/^[a-z0-9-]+$/);
 const language = z.enum(languages);
 const questionId = z.string().max(100);
-export const profileSchema = z.object({displayName: shortText, targetRole: shortText, weeklyGoal: z.number().int().min(1).max(50)}).strict();
-export const progressSchema = z.object({problemId, status: z.enum(["not-started", "practicing", "solved"]), reviewLater: z.boolean(), notes, updatedAt: timestamp}).strict();
-export const draftSchema = z.object({problemId, language, code: z.string().max(50000), updatedAt: timestamp}).strict();
+const profileSchema = z.object({displayName: shortText, targetRole: shortText, weeklyGoal: z.number().int().min(1).max(50)}).strict();
+const progressSchema = z.object({problemId, status: z.enum(["not-started", "practicing", "solved"]), reviewLater: z.boolean(), notes, updatedAt: timestamp}).strict();
+const draftSchema = z.object({problemId, language, code: z.string().max(50000), updatedAt: timestamp}).strict();
 export const storySchema = z.object({
   id: uuid, title: z.string().min(1).max(200), situation: notes, task: notes, action: notes,
   result: notes, reflection: notes, tags: z.array(z.enum(competencies)).max(8),
   questionIds: z.array(z.string().refine(id => behavioralQuestions.some(q => q.id === id))).max(20), updatedAt: timestamp,
 }).strict();
-export const transcriptSchema = z.object({id: uuid, role: z.enum(["interviewer", "candidate"]), text: z.string().min(1).max(10000), timestamp}).strict();
+const transcriptSchema = z.object({id: uuid, role: z.enum(["interviewer", "candidate"]), text: z.string().min(1).max(10000), timestamp}).strict();
 export const feedbackSchema = z.object({
   source: z.enum(["mock", "agent"]), summary: z.string().max(10000),
   strengths: z.array(notes).max(50), improvements: z.array(notes).max(50), evidence: z.array(notes).max(50), nextActions: z.array(notes).max(50),

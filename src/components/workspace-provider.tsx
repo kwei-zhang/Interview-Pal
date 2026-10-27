@@ -8,7 +8,7 @@ import { applyMutation, emptyWorkspace, type WorkspaceData, type WorkspaceMutati
 import { AUTH_CHANGE_KEY } from "@/lib/auth";
 import { createAccountFetch } from "@/lib/account-client";
 
-export const LOCAL_STORAGE_KEY = "interview-pal.workspace.v1";
+const LOCAL_STORAGE_KEY = "interview-pal.workspace.v1";
 type SyncState = "loading" | "saved" | "saving" | "error";
 interface WorkspaceContextValue {
   data: WorkspaceData; ready: boolean; mode: "demo" | "cloud"; syncState: SyncState; error: string;

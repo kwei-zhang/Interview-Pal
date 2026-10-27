@@ -14,7 +14,7 @@ export const agentRequestSchema = z.object({
   context: z.object({language: z.enum(languages).optional(), code: z.string().max(12000).optional(), testSummary: z.string().max(4000).optional(), codeTruncated: z.boolean().optional()}).strict().optional(),
   sdp: z.string().min(10).max(30000).optional(),
 }).strict().refine(r => r.action !== "voice" || r.sdp?.startsWith("v=0"), "A valid WebRTC offer is required.").refine(r => r.action !== "verify" || (r.session.type === "coding" && Boolean(r.context?.code?.trim())), "Code verification requires a coding session and editor code.");
-export type AgentRequest = z.infer<typeof agentRequestSchema>;
+type AgentRequest = z.infer<typeof agentRequestSchema>;
 export function openAIConfig(env: Record<string, string | undefined> = process.env) {
   if (!env.OPENAI_API_KEY?.trim()) throw new HttpError(503, "Add OPENAI_API_KEY to .env.local and restart the server to connect the AI interviewer.");
   return {key: env.OPENAI_API_KEY.trim(), chatModel: env.OPENAI_INTERVIEW_MODEL || "gpt-4.1-mini", realtimeModel: env.OPENAI_REALTIME_MODEL || "gpt-realtime-2.1"};

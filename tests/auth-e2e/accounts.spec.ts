@@ -37,7 +37,7 @@ test("Admin invites a member; member verifies, saves a private draft, and recove
   await candidate.getByLabel("Confirm password").fill(password);
   await candidate.screenshot({path: "/private/tmp/interview-pal-signup.png"});
   await candidate.getByRole("button", {name: "Create account"}).click();
-  await expect(candidate.getByRole("heading", {name: "Check your inbox."})).toBeVisible();
+  await expect(candidate.getByRole("heading", {name: "Verify your email."})).toBeVisible();
   await candidate.goto(appUrl("/login"));
   await candidate.getByLabel("Email", {exact: true}).fill(email); await candidate.getByLabel("Password", {exact: true}).fill(password);
   await candidate.getByRole("button", {name: "Sign in", exact: true}).click();
@@ -45,13 +45,12 @@ test("Admin invites a member; member verifies, saves a private draft, and recove
   await candidate.getByRole("link", {name: "Resend verification email"}).click();
   await expect(candidate.getByRole("heading", {name: "Verify your email."})).toBeVisible();
   await candidate.getByLabel("Email", {exact: true}).fill(email);
-  await candidate.getByRole("button", {name: "Resend confirmation"}).click();
-  await expect(candidate.getByRole("heading", {name: "Check your inbox."})).toBeVisible();
+  await candidate.getByRole("button", {name: "Send verification code"}).click();
   const message = await (await request.get(`http://127.0.0.1:54329/__test/mailbox?email=${email}`)).json();
-  expect(message.redirectTo).toBe(`https://interview.example.test${mount}/auth/confirm`);
-  await candidate.goto(appUrl(`/auth/confirm?token_hash=${message.token}&type=email`));
-  await candidate.getByRole("button", {name: "Confirm email", exact: true}).click();
-  await expect(candidate).toHaveURL(appUrl("/"));
+  await candidate.getByLabel("Verification code", {exact: true}).fill(message.code);
+  await candidate.getByRole("button", {name: "Verify email", exact: true}).click();
+  await expect(candidate).toHaveURL(appUrl("/login?notice=email-verified"));
+  await login(candidate, email, password);
   await expect(candidate.getByRole("link", {name: "Administration"})).toHaveCount(0);
   await candidate.goto(appUrl("/coding/two-sum"));
   await candidate.getByLabel("Solution code", {exact: true}).fill("# candidate's private draft");
@@ -78,10 +77,9 @@ test("Admin invites a member; member verifies, saves a private draft, and recove
   await candidate.getByRole("button", {name: "Send reset link"}).click();
   await expect(candidate.getByRole("heading", {name: "Check your inbox."})).toBeVisible();
   const recovery = await (await request.get(`http://127.0.0.1:54329/__test/mailbox?email=${email}`)).json();
-  expect(recovery.redirectTo).toBe(`https://interview.example.test${mount}/auth/confirm`);
-  await candidate.goto(appUrl(`/auth/confirm?token_hash=${recovery.token}&type=recovery`));
-  await candidate.getByRole("button", {name: "Continue to password reset"}).click();
-  await expect(candidate).toHaveURL(/\/reset-password$/);
+  expect(recovery.redirectTo).toBe(`https://interview.example.test${mount}/reset-password`);
+  await candidate.goto(appUrl(`/reset-password?token=${recovery.token}`));
+  await candidate.reload(); // Email scanner / repeated GET must not consume the token.
   await candidate.getByLabel("Password", {exact: true}).fill("Changed-password-2026");
   await candidate.getByLabel("Confirm password").fill("Changed-password-2026");
   await candidate.getByRole("button", {name: "Update password"}).click();
@@ -103,9 +101,13 @@ test("Admin can replace and revoke codes; invalid and expired links have recover
   await pending.getByRole("button", {name: "Revoke", exact: true}).click();
   await expect(page.getByRole("row").filter({hasText: email}).filter({hasText: "Revoked"})).toHaveCount(2);
   await page.goto(appPath("/auth/confirm?token_hash=expired-token&type=email"));
-  await page.getByRole("button", {name: "Confirm email", exact: true}).click();
-  await expect(page.locator(".form-error[role=alert]")).toContainText("invalid or expired");
-  await expect(page.getByRole("link", {name: "Request a new email"})).toHaveAttribute("href", appPath("/verify-email"));
+  await expect(page.getByRole("link", {name: "Reconnect existing account"})).toBeVisible();
+  await page.goto(appPath("/reset-password?token=expired-token"));
+  await page.getByLabel("Password",{exact:true}).fill("Changed-password-2026");
+  await page.getByLabel("Confirm password").fill("Changed-password-2026");
+  await page.getByRole("button",{name:"Update password"}).click();
+  await expect(page.locator(".form-error[role=alert]")).toContainText("Request a new recovery link");
+
 });
 
 test("Another tab signing in clears old state and stale saves/beacons cannot cross accounts", async ({page, context}) => {
@@ -132,7 +134,7 @@ test("Unauthenticated APIs and cross-origin auth mutations are rejected", async 
   expect(protectedPage.headers().location).toBe(appPath("/login"));
   expect((await request.get(appPath("/api/admin/users"))).status()).toBe(401);
   expect((await request.get(appPath("/api/workspace"))).status()).toBe(401);
-  for (const action of ["signup", "confirm", "resend", "forgot-password", "reset-password", "logout"]) {
+  for (const action of ["signup", "reconnect", "confirm", "resend", "forgot-password", "reset-password", "logout"]) {
     expect((await request.post(appPath(`/api/auth/${action}`), {headers: {origin: "https://another.example"}, data: {}})).status()).toBe(403);
   }
 });
@@ -145,7 +147,7 @@ test("Navigation, Monaco assets, cookies, and agent requests stay in the app pat
   });
   await login(page);
   await expect(page.getByRole("link", {name: "Overview", exact: true})).toHaveClass(/active/);
-  const cookies = (await context.cookies()).filter(cookie => cookie.name.startsWith("sb-"));
+  const cookies = (await context.cookies()).filter(cookie => cookie.name.startsWith("__Secure-neon-auth."));
   expect(cookies.length).toBeGreaterThan(0);
   expect(cookies.every(cookie => cookie.path === (mount || "/"))).toBe(true);
   await page.getByRole("link", {name: "Coding practice"}).click();
@@ -156,4 +158,56 @@ test("Navigation, Monaco assets, cookies, and agent requests stay in the app pat
   const agent = await page.request.post(appPath("/api/interview-agent"), {headers: {origin: "http://127.0.0.1:3102", "x-workspace-user-id": adminId}, data: {}});
   expect(agent.status()).toBe(400);
   expect(rootRequests).toEqual([]);
+});
+
+test("Existing admin reconnects to the original UUID; suspended imported users stay blocked", async({page,request})=>{
+  for(const email of ["legacy-admin@example.test","legacy-suspended@example.test"]) {
+    await page.goto(appPath("/reconnect"));
+    await page.getByLabel("Your name").fill("Original account");
+    await page.getByLabel("Email",{exact:true}).fill(email);
+    await page.getByLabel("Password",{exact:true}).fill("Reconnected-password-2026");
+    await page.getByLabel("Confirm password").fill("Reconnected-password-2026");
+    await page.getByRole("button",{name:"Reconnect account"}).click();
+    await expect(page.getByLabel("Verification code",{exact:true})).toBeVisible();
+    const mail=await (await request.get(`http://127.0.0.1:54329/__test/mailbox?email=${email}`)).json();
+    await page.getByLabel("Verification code",{exact:true}).fill(mail.code);
+    await page.getByRole("button",{name:"Verify email",exact:true}).click();
+    await expect(page).toHaveURL(appUrl("/login?notice=email-verified"));
+    if(email.startsWith("legacy-admin")) {
+      await login(page,email,"Reconnected-password-2026");
+      await expect(page.getByRole("link",{name:"Administration"})).toBeVisible();
+      const me=await page.request.get(appPath("/api/auth/me"),{headers:{"x-workspace-user-id":"33333333-3333-4333-8333-333333333333"}});
+      expect((await me.json()).role).toBe("admin");
+    } else {
+      await page.getByLabel("Email",{exact:true}).fill(email);
+      await page.getByLabel("Password",{exact:true}).fill("Reconnected-password-2026");
+      await page.getByRole("button",{name:"Sign in",exact:true}).click();
+      await expect(page.locator(".form-error[role=alert]")).toContainText("verified, active access");
+    }
+  }
+});
+
+test("Direct provider signup and invalid webhook signatures cannot bypass admission", async({request})=>{
+  const bypass=await request.post('http://127.0.0.1:54329/auth/sign-up/email',{data:{email:'bypass@example.test',name:'Bypass',password:'Long-password-2026'}});
+  expect(bypass.status()).toBe(200); // Neon's enumeration-safe response is not proof of account creation.
+  const state=await (await request.get('http://127.0.0.1:54329/__test/mailbox?email=bypass@example.test')).json();
+  expect(state.registered).toBe(false);
+  const forged=await request.post(appPath('/api/auth/neon-webhook'),{data:{event_type:'user.created'}});
+  expect(forged.status()).toBe(401);
+  for(const path of ['sign-up/email','update-user','delete-user','sign-in/social'])expect((await request.post(appPath(`/api/auth/${path}`),{data:{}})).status()).toBe(404);
+});
+
+test("A provider's masked signup rejection does not consume the invite or show verification success",async({page,request})=>{
+  await login(page);await page.goto(appPath('/admin'));
+  const email='masked-rejection@example.test';
+  await page.getByLabel('Recipient email').fill(email);
+  await page.getByRole('button',{name:'Create or replace invite'}).click();
+  const inviteCode=await page.getByLabel('Invitation code to share').inputValue();
+  const response=await request.post(appPath('/api/auth/signup'),{headers:{origin:'http://127.0.0.1:3102'},data:{email,inviteCode,displayName:'Rejected signup',password:'Rejected-password-2026'}});
+  expect(response.status()).toBe(400);
+  expect((await response.json()).error).toContain('not admitted');
+  const state=await (await request.get(`http://127.0.0.1:54329/__test/mailbox?email=${email}`)).json();
+  expect(state.registered).toBe(false);expect(state.userId).toBeUndefined();
+  await page.reload();
+  await expect(page.getByRole('row').filter({hasText:email}).getByText('Pending',{exact:true})).toBeVisible();
 });

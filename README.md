@@ -1,6 +1,6 @@
 # Interview Pal
 
-A private interview preparation workspace built with Next.js, TypeScript, Tailwind, Monaco, Supabase, and OpenAI voice interviews with Code Interpreter verification.
+A private interview preparation workspace built with Next.js, TypeScript, Tailwind, Monaco, Neon PostgreSQL with managed Better Auth, and OpenAI voice interviews with Code Interpreter verification.
 
 ## What is implemented
 
@@ -12,7 +12,7 @@ A private interview preparation workspace built with Next.js, TypeScript, Tailwi
 - Coding and behavioral interview rooms, timers, microphone preflight, live voice input/playback, typed responses, scratchpads, ordered transcripts, interrupted-session resume, and saved reviews.
 - An OpenAI interviewer that answers clarification questions using the authored problem specification, recent conversation, current language/code, and supplied test results. Typed chat uses the Responses API; live voice uses Realtime WebRTC with automatic turn detection and interruptions. AI reviews contain evidence and descriptive evaluation dimensions.
 - Responsive preparation/review pages, light/dark themes, invite-only email/password accounts, and workspace/transcript exports.
-- Single-use invitations tied to email, verification and password recovery, and admin invitation/access management. Privileges bind to an explicitly designated Auth user ID.
+- Single-use invitations tied to email, verification and password recovery, and admin invitation/access management. Privileges bind to the stable application account UUID.
 
 Interview Pal does not store raw audio. Live voice sends audio directly to OpenAI over WebRTC; conversation context and review requests are also sent to OpenAI. AI answers and feedback can be incorrect; inspect the saved evidence.
 
@@ -25,42 +25,27 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:3000. Without Supabase variables, development on localhost provides a browser-local demo. Demo data survives reloads through localStorage. Interviews and Python verification require a server-side OpenAI API key. The localhost preview supports both; production requires private Supabase login. Production never enables the demo.
+Open http://127.0.0.1:3000. Without Neon variables, development on localhost provides a browser-local demo. Demo data survives reloads through localStorage. Interviews and Python verification require a server-side OpenAI API key. The localhost preview supports both; production requires private Neon login. Production never enables the demo.
 
 Monaco assets are copied from the installed dependency to `public/vendor/monaco` during install/build, so the editor does not depend on a CDN. The plain editor toggle offers an accessible textarea and works well on mobile.
 
-The Top Interview 150 catalog update includes `supabase/migrations/202610270001_top_interview_150.sql`. Apply it before using new questions in a connected workspace; it preserves existing progress, drafts, sessions, and retired problem IDs. `npm run seed:generate` refreshes the fresh-install seed.
+## Configure Neon and invite-only accounts
 
-## Configure Supabase and invite-only accounts
+Use server-only `DATABASE_URL`, `NEON_AUTH_BASE_URL` and a cryptographically random `NEON_AUTH_COOKIE_SECRET` (at least 32 characters). Set `AUTH_SITE_URL` to the canonical HTTPS origin, with `/interview` when that base path is enabled. The runtime database credential must belong to `interview_runtime`, a login role that inherits only `interview_app`. The server rejects migration-owner/superuser connections. No browser SQL client, Data API, service-role credential or catch-all authentication proxy is exposed.
 
-1. Keep **Allow new users to sign up** disabled during setup. Apply migrations 001–003 and the seed if they have not already been applied. Preserve current Auth accounts and workspace data.
-2. Ensure your own verified email/password account already exists. For a fresh project, provision **zhangkw0622@gmail.com** in Authentication → Users before applying migration 004. A database reset creates no privileged user automatically; provision the designated account before migration 004 in that environment too.
-3. Apply `supabase/migrations/202610100004_invite_only_users.sql`, followed by `supabase/migrations/202610110005_invitation_diagnostics.sql` and `supabase/migrations/202610110006_invitation_auth_rls.sql`. Existing accounts become ordinary members; invitation enforcement and active membership policies take effect. Then run `supabase/bootstrap-admin.sql` separately. It resolves **zhangkw0622@gmail.com** to exactly one verified, non-anonymous Auth user and grants that UUID admin access. It fails without granting access if the account is missing, unverified, or ambiguous. Admin access never comes from a first signup or profile fields. For a different installation, explicitly change the designated account in this setup file before running it.
-4. In Authentication → Hooks, enable **Before User Created**, choose Postgres, and select `public.before_user_created`. The database signup trigger also enforces invitations if this hook is misconfigured. Hook checks do not consume codes; account creation and redemption commit together. See [Supabase Auth hooks](https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook).
-5. Configure [custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp) in Supabase for confirmation/recovery emails. The default mail service only sends to project team addresses. Set Supabase's Site URL and `AUTH_SITE_URL` to your actual website origin (for example, `http://127.0.0.1:3001` locally, HTTPS in production), and allow that origin's `/auth/confirm` redirect.
-6. Replace the **Confirm signup** and **Reset password** email templates with `supabase/templates/confirmation.html` and `supabase/templates/recovery.html`. They send users to an explicit confirmation button, so a mail scanner's GET does not consume the token. Enable **Confirm email**, set minimum password length to **12**, retain Supabase Auth rate limits, and set the email resend interval to at least 60 seconds. No verification/recovery email should contain an invitation code.
-7. After the migration, admin binding, hook, and email configuration are ready, enable email/password signup. Keep anonymous sign-ins, phone, and OAuth providers disabled. Registration is now gated by database invitation checks. Local settings and templates are in `supabase/config.toml`; hosted settings must be configured separately.
-8. Copy `.env.example` to `.env.local` and fill these values:
+Apply `neon/migrations` with separate `MIGRATION_DATABASE_URL` credentials. See [the migration runbook](neon/README.md) for full-backup inspection, dry-run checks, import and runtime-role provisioning. Historical `supabase/` migrations/templates remain for backup interpretation and recovery; the application no longer calls Supabase.
 
-```dotenv
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLISHABLE_KEY
-AUTH_SITE_URL=http://127.0.0.1:3001
-```
+The Top Interview 150 update includes `006_top_interview_150.sql`; apply it with `npm run db:migrate` before using new questions in a connected workspace. It adds the new catalog and preserves existing progress, drafts, sessions, and retired problem IDs. `npm run seed:generate` refreshes the fresh-install seed without rewriting applied migrations.
 
-The second variable accepts a current `sb_publishable_…` key or a legacy `anon` key. Never put `sb_secret_…` or `service_role` credentials in a public variable. No service-role key is required. See [Supabase's key documentation](https://supabase.com/docs/guides/api/api-keys).
+In Neon Auth, enable email/password with **OTP email verification**, require verification, send a verification code on signup, and disable automatic sign-in after verification. Disable OAuth/anonymous/phone signups. Keep signup disabled until the signed `user.before_create` and `user.created` webhook at `/api/auth/neon-webhook` is reachable over HTTPS. Subscribe only to those two events so Neon retains its shared email delivery. Configure trusted website origins and test actual delivery/rate limits before production. See [Neon webhooks](https://neon.com/docs/auth/guides/webhooks).
 
-Restart Next.js after changing environment variables. Sign in at `/login`. The designated admin sees **Administration** in the sidebar. Create an invitation for a recipient email and copy the code immediately; only its hash is stored. Share it manually and direct the recipient to `/signup`. Codes expire after seven days and are consumed when the unverified account is created. Verification resends and password recovery need no new invitation. Replacing an unused invitation revokes the old one; existing accounts use verification resend/recovery instead of a second registration.
+Existing users choose **Reconnect existing account**, enter their original email and a new password, verify the emailed code, then sign in. Passwords and sessions cannot transfer from Supabase. Stable application UUIDs, roles and suspension status are preserved; a unique private mapping binds each application account to one verified Neon identity. Unverified, ambiguous or already-linked identities cannot reconnect an account. Admin privileges never come from signup fields or the first registration.
 
-Admins can list account identity/access details and suspend or restore ordinary members. Admins cannot change roles in the website or read another user's drafts, stories, transcripts, or feedback. Suspension denies subsequent API and database access, including existing JWTs. Already-established provider voice connections are not forcibly terminated at the provider. The browser checks membership on focus and every 30 seconds and closes its room when access is lost. Logout and password recovery remain available to suspended accounts.
+The admin creates an email-bound invitation in **Administration** and copies the code immediately; only its hash is stored. Share it manually and direct the recipient to `/signup`. The server exchanges a valid code for a short-lived admission token before calling Neon. The signed before-create hook approves the email admission without consuming the invitation. The created event or signup response binds the resulting provider identity. After account creation, finalization atomically creates membership and redeems the invitation. Signed created events and fresh authenticated sessions retry finalization safely. Revoked invitations cannot finalize. Verification resend and password recovery need no new invitation. An orphan provider account after revocation/partial failure requires administrator investigation; never bypass admission to repair it.
 
-Personal tables retain owner-scoped RLS plus verified, active membership checks. Catalogs also require active membership. Workspace reads/writes (including unload beacons) and agent/admin requests bind to the user ID captured when the page loaded. Another tab signing in clears old state; stale requests cannot save into the new account. Cloud content never enters the localhost demo's browser storage. Story/link and session/event/feedback writes remain atomic, with visible save errors and retry for network failures.
+Admins may list account access details and suspend/restore ordinary members, but cannot read another user's drafts, stories, transcripts or feedback. Each API request checks a fresh provider session and current database membership. RLS requires transaction-local application identity, verified email and active membership. Suspension takes effect on subsequent requests. Already-established voice connections close when the browser checks membership (on focus/every 30 seconds); the provider connection is not forcibly revoked server-side.
 
-To use the Supabase CLI, install it separately, link the intended project, and push unapplied migrations. Provision the designated account before migration 004 on a fresh database. Apply the separate bootstrap SQL explicitly, then configure the hosted Auth hook and email settings. Never enable signup first. If rollout fails, disable signup again and preserve membership/invitation tables and personal data while fixing configuration.
-
-If signup fails even though an invitation is pending, apply only migration `202610110005_invitation_diagnostics.sql` to an existing installation using Supabase SQL Editor, then retry signup once and inspect **Auth service logs**. This migration changes only the hook's diagnostic error message; it preserves invitation enforcement, existing accounts, and pending codes. No Vercel redeploy is needed for the diagnostic. The error includes a fixed label such as `[invite:missing_code]`, `[invite:code_not_found]`, `[invite:email_mismatch]`, or `[invite:missing_provider]`. Share only that label when troubleshooting. Never log the hook payload or submit passwords/codes to support. A pending invitation confirms its stored status, not that the submitted code and email match it.
-
-If valid pending codes report `code_not_found`, check whether `private.invitations` has RLS enabled without a SELECT policy for `supabase_auth_admin`. The hook is a security-invoker function, so a table grant alone is insufficient. Apply migration `202610110006_invitation_auth_rls.sql` to add the internal Auth read policy while keeping RLS enabled. This preserves existing codes and does not grant browser roles access. No application redeploy is needed for this database repair.
+Workspace mutations, beacons, agent and admin requests bind to the application UUID captured at page load. Another tab switching accounts clears old state; stale requests cannot save into the new account. Story/link and session/event/feedback saves remain atomic. Password-reset GETs only display the form; the token is consumed by explicit submission. Logout and password recovery are available even when an account is suspended.
 
 ## Interview code verification
 
@@ -89,7 +74,7 @@ The two model names can be changed to compatible models available to your API pr
 
 All interviews use OpenAI. Starting a new interview requires a configured API key; there is no scripted fallback. Older interrupted practice sessions automatically resume with OpenAI, keeping their transcript, timer, and code. Completed historical reviews remain available without being relabeled as AI evaluations. Entering or resuming a room connects live voice and opens your microphone automatically; allow microphone permission if your browser asks. The live interviewer greets you and introduces the selected question for a new session, without repeating it on resume. You can also type a question such as “Can the input be empty?” and send it. If voice cannot connect, typed chat stays available and **Speak** retries the connection. Spoken turns send automatically when you stop talking. **Mute mic** pauses microphone input; the audio control mutes playback. Leaving or finishing releases the microphone and connection. Reloading an interrupted session preserves its transcript and reconnects voice automatically.
 
-For a cloud workspace, apply `supabase/migrations/202610100002_interview_agent.sql` as well as the foundation migration. The agent endpoint requires private login and an owned, saved, active session. The only exception is development on localhost without Supabase, where a local demo can connect for testing. Responses requests use `store: false`. Operational logs include provider, session ID, action, status, and latency, never conversation text or credentials. Requests have bounded context, output tokens, and timeouts; server API requests are limited to 30/minute and 1,000/day per account. These quotas apply to connection/reply/review requests, not individual spoken turns within a connected Realtime call; configure your OpenAI project spending limits separately.
+The Neon migrations include persistent interview and execution quotas. The agent endpoint requires private login and an owned, saved, active session. The only exception is development on localhost without Neon, where a local demo can connect for testing. Responses requests use `store: false`. Operational logs include provider, session ID, action, status, and latency, never conversation text or credentials. Requests have bounded context, output tokens, and timeouts; server API requests are limited to 30/minute and 1,000/day per account. These quotas apply to connection/reply/review requests, not individual spoken turns within a connected Realtime call; configure your OpenAI project spending limits separately.
 
 A provider failure leaves candidate turns and code saved. Retrying a failed typed turn avoids duplicating the candidate message. If feedback fails, the completed review explicitly says no assessment was generated. The interviewer receives public examples and verification outcomes, not preparation notes or the story bank. The judge receives the problem brief and unchanged candidate code and generates check cases at request time. Code context is capped at 12,000 characters and conversation context at 32,000; full drafts and transcripts remain in the workspace.
 
@@ -112,7 +97,7 @@ Verify actual microphone permission behavior, audio playback, interruptions, rec
 - `src/lib/problems/starters.ts`: problem-specific function signatures, class APIs, and node definitions for the additional 135 interview questions. Existing drafts are kept; untouched legacy placeholders upgrade automatically.
 - `src/lib/problems/definitions.ts`: the original 15 briefs and public examples, without fixed test suites.
 - `src/lib/problems/function-starters.ts`: function and structural starters for those original briefs.
-- `supabase/migrations`: profiles, role tracks, question collections, catalogs, drafts, progress, stories/links, sessions/events/feedback, attempts, and quota slots.
+- `neon/migrations`: accounts, identity mappings, admission and webhook receipts, profiles, role tracks, question collections, catalogs, drafts, progress, stories/links, sessions/events/feedback, attempts, and quota slots.
 
 To customize interview behavior, edit the `instructions` function in the matching prompt file above. Each file also contains its own `opening`, `resume`, and `feedback` instructions. Keep the dynamic question/context fields intact. Typed responses use saved changes on the next request; start a new voice session to load changed instructions.
 
@@ -127,7 +112,7 @@ npm run typecheck
 npm test
 npm run test:e2e
 npm run test:auth
-# Optional real-PostgreSQL race test; requires initdb, pg_ctl, and psql on PATH:
+# Real-PostgreSQL race test; requires initdb and pg_ctl:
 npm run test:invite-concurrency
 npm run build
 ```
@@ -136,17 +121,17 @@ Regression tests validate all 450 starter declarations, LLM plan parsing, immuta
 
 Browser tests use installed Google Chrome via Playwright. They start a separate development server on port 3100 with cloud variables overridden empty. They cover preparation, stories, completed/interrupted sessions, saved reviews, unavailable execution, responsive navigation, themes, and API origin checks. Install Chrome or adjust `playwright.config.ts` to your browser. Test reports/traces and local credentials are ignored by Git.
 
-`test:auth` builds and runs a separate production app on port 3102 with a test-only Supabase HTTP fixture on 54329. It exercises real SQL migrations/RLS in PGlite while substituting Auth password/verification delivery. It covers admin invites, verified signup, private draft persistence, suspension, recovery, stale cross-account saves/beacons, and expired links. No real accounts are created and no email is sent. Database tests also cover direct insertion bypasses, secret scrubbing, rollback, role escalation, and owner isolation. The concurrency script creates and removes its own temporary PostgreSQL cluster and races two independent connections against one invitation.
+`test:auth` builds a production app on port 3102 with a test-only Neon Auth fixture on 54329 and isolated PostgreSQL 17 on 54328. It exercises the actual SDK, signed webhooks, SQL and RLS while substituting provider passwords and email delivery. Tests cover reconnecting an existing admin, suspended imports, invitation signup, codes, recovery, private drafts, stale saves/beacons, cookie scope and disallowed auth endpoints. No real email is sent. PostgreSQL binaries must be on PATH or configured with `PG_BIN`; Homebrew PostgreSQL 17 is detected on macOS. Fixtures stop their temporary cluster on graceful shutdown.
 
-Before deployment, exercise one real invitation through confirmation email and one real password reset in your configured Supabase project. Fixture tests do not validate hosted SMTP delivery or dashboard hook configuration. Operational application logs omit passwords, invite codes, and Auth tokens; do not enable request-body logging on auth routes, and redact confirmation URL query strings in infrastructure logs.
+The concurrency script uses independent PostgreSQL connections to race invitation finalization and legacy account linking. The historical Supabase invitation tests remain to protect backup interpretation. Before cutover, verify real Neon signup/email delivery, existing-admin reconnection, password recovery including session revocation, saved workspace reloads and one complete interview. Fixture tests do not prove the hosted provider configuration. Operational logs must omit auth request bodies, credentials and reset query strings.
 
 Regression fixtures run locally; user Python code runs only in OpenAI Code Interpreter. Fixture tests do not establish live model/tool access; verify a real interview code check after configuring your API key.
 
 ## Deploy to Vercel
 
-Import this repository as a Next.js project, use `npm run build`, and configure Supabase, OpenAI, and `AUTH_SITE_URL` in Vercel. Complete the invitation migration, explicit admin binding, Auth hook, SMTP, and confirmation/recovery templates before enabling email signup. Set Supabase’s Site URL to the same HTTPS origin. Keep alternative signup providers disabled.
+Use the existing Next.js Vercel project and `npm run build`. Set the three server-only Neon variables, `AUTH_SITE_URL`, `NEXT_PUBLIC_BASE_PATH`, and retain the existing OpenAI environment. Deploy a preview first. Configure the signed webhook to its reachable HTTPS endpoint; when preview protection is enabled, use a server-kept automation bypass in the webhook URL. Never disable protection globally just for a webhook test. Switch the webhook to the stable production origin during the coordinated cutover.
 
-Production requires Supabase and otherwise displays a setup page. Operational error logs contain classifications and session/job identifiers, not stories, source code, transcript text, or credentials. Reviews persist completed and interrupted sessions separately. The OpenAI adapter is implemented; manual spoken-session verification on your target browser is still required before release.
+Production requires Neon and otherwise displays setup instructions. Keep Supabase paused and its full backup intact. Once Neon accepts writes, rollback requires a fresh Neon backup and reconciliation; reverting only the frontend would lose new work.
 
 ### Serve Interview Pal at `https://www.kwei.me/interview`
 
@@ -162,17 +147,18 @@ Use two Vercel projects: the existing `kwei-zhang/ZJN` website continues to own 
    | --- | --- |
    | `NEXT_PUBLIC_BASE_PATH` | `/interview` |
    | `AUTH_SITE_URL` | `https://www.kwei.me/interview` |
-   | `NEXT_PUBLIC_SUPABASE_URL` | Existing project URL from `.env.local` |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Existing publishable/anon key from `.env.local` |
+   | `DATABASE_URL` | Restricted Neon runtime connection |
+   | `NEON_AUTH_BASE_URL` | Managed Better Auth endpoint |
+   | `NEON_AUTH_COOKIE_SECRET` | Random server-only secret |
    | `OPENAI_API_KEY` | Existing server-only API key from `.env.local` |
    | `OPENAI_INTERVIEW_MODEL` | Existing model value from `.env.local` |
    | `OPENAI_REALTIME_MODEL` | Existing model value from `.env.local` |
 
 4. Deploy. Copy the stable production `.vercel.app` domain shown under the Interview Pal project's Settings → Domains. Visit `https://YOUR-APP.vercel.app/interview/login`; the app now lives under `/interview` even on this upstream domain. Keep Fluid Compute enabled: the interviewer route allows up to 210 seconds for code verification. The upstream production deployment must be reachable by the main website's rewrite; check deployment protection if it returns a Vercel authentication page.
 5. In the **existing ZJN website project**, add `INTERVIEW_APP_ORIGIN=https://YOUR-APP.vercel.app` to Production environment variables. This value is the upstream origin only, with no `/interview` suffix. Copy `deployment/kwei-next.config.example.ts` from this repo into that website's `next.config.ts`, preserving any other settings. The current local ZJN config is empty. Commit/push the website config, or redeploy after setting the variable. These routing rules belong in ZJN, not Interview Pal. Use a plain `<a href="/interview">Interview practice</a>` for any homepage link across the two applications.
-6. In Supabase Authentication → URL Configuration, set **Site URL** to `https://www.kwei.me/interview` and add **Redirect URL** `https://www.kwei.me/interview/auth/confirm`. Keep the confirmation and recovery templates from `supabase/templates`; they append `/auth/confirm` to Site URL. Account records, database migrations, passwords, and invitation codes do not need to be recreated. Once Site URL changes, these email templates send even local test requests to the deployed site; use a separate Supabase project when independent local email testing is needed.
-7. Open `https://www.kwei.me/interview/login` and sign in with your existing account. Verify homepage access, saved drafts after reload, Monaco loading, invitations, password recovery, and a complete spoken interview before sharing the link. Check the URL stays under `/interview` after login, logout, and email confirmation.
+6. In Neon Auth, trust `https://www.kwei.me`, require verification codes, and configure the signed webhook at `https://www.kwei.me/interview/api/auth/neon-webhook`. Keep alternative providers disabled. Use a separate Neon branch/project for independent auth testing.
+7. Reconnect your original account at `/interview/reconnect`. Confirm the imported admin role, workspace history, drafts saved after reload, Monaco assets, invitations, recovery and a complete interview. Promote the tested deployment only after those checks pass.
 
 `NEXT_PUBLIC_BASE_PATH` is a build-time setting: rebuild/redeploy after changing it. Leave it unset or empty in local `.env.local` to keep `http://127.0.0.1:3001` working as before. Native Next.js links handle the prefix; app fetches, browser redirects, public editor assets, auth email URLs, and auth cookie paths explicitly honor it. Origin checks accept the configured HTTPS public origin behind Vercel's rewrite without trusting arbitrary forwarded-host headers. Private workspace/admin responses remain uncached.
 
-Run `TEST_BASE_PATH=/interview npm run test:auth` to exercise the production build, account flows, cookie scope, drafts, and editor assets under the prefix using the isolated Supabase fixture. `npm run test:auth` checks the original root deployment. The fixture does not test the live Vercel routing or hosted email delivery.
+Run `TEST_BASE_PATH=/interview npm run test:auth` to exercise the production build, account flows, cookie scope, drafts, and editor assets under the prefix using the isolated Neon fixture. `npm run test:auth` checks the original root deployment. The fixture does not test the live Vercel routing or hosted email delivery.

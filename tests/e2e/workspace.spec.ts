@@ -1,3 +1,4 @@
+import {mountedPath} from "../helpers/paths";
 import { test, expect } from "@playwright/test";
 import { emptyWorkspace, draftKey, type InterviewSession } from "../../src/lib/types";
 
@@ -15,7 +16,7 @@ test.beforeEach(async ({page}) => {
   });
 });
 test("Dashboard and complete curriculum support meaningful filters", async ({page}) => {
-  await page.goto("/");
+  await page.goto(mountedPath("/"));
   await expect(page.getByRole("heading", {name: "A little practice. A lot more confidence."})).toBeVisible();
   await page.screenshot({path: "/private/tmp/interview-pal-dashboard.png"});
   await page.getByRole("link", {name: "Coding practice 150"}).click();
@@ -30,7 +31,7 @@ test("Dashboard and complete curriculum support meaningful filters", async ({pag
   await expect(page.getByRole("link", {name: /3Sum/})).toBeVisible();
 });
 test("New Top Interview 150 starters switch languages, reset, and preserve drafts", async ({page}) => {
-  await page.goto("/coding/merge-sorted-array");
+  await page.goto(mountedPath("/coding/merge-sorted-array"));
   const editor = page.getByLabel("Solution code", {exact: true});
   await expect(editor).toHaveValue(/def merge\(nums1: List\[int\], m: int, nums2: List\[int\], n: int\) -> None:/);
   await editor.fill("# my merge draft");
@@ -50,7 +51,7 @@ test("New Top Interview 150 starters switch languages, reset, and preserve draft
   await expect(page.getByLabel("Problem", {exact: true})).toHaveValue("merge-sorted-array");
 });
 test("Drafts by language, notes, progress and review flags survive reload", async ({page}) => {
-  await page.goto("/coding/two-sum");
+  await page.goto(mountedPath("/coding/two-sum"));
   await page.getByLabel("Solution code", {exact: true}).fill("def twoSum(nums, target):\n    return [0, 1]\n");
   await page.getByLabel("Coding language").selectOption("typescript");
   await page.getByLabel("Solution code", {exact: true}).fill("function twoSum(nums: number[], target: number): number[] { return [1, 0]; }");
@@ -67,13 +68,13 @@ test("Drafts by language, notes, progress and review flags survive reload", asyn
   await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue("def twoSum(nums, target):\n    return [0, 1]\n");
 });
 test("External catalog problems still support saved notes and progress", async ({page}) => {
-  await page.goto("/coding/median-of-two-sorted-arrays");
+  await page.goto(mountedPath("/coding/median-of-two-sorted-arrays"));
   await expect(page.getByRole("link", {name: "Open on LeetCode"})).toHaveAttribute("href", "https://leetcode.com/problems/median-of-two-sorted-arrays/");
   await page.getByLabel("Your notes").fill("Review partition boundaries.");
   await page.reload(); await expect(page.getByLabel("Your notes")).toHaveValue("Review partition boundaries.");
 });
 test("STAR stories link to multiple questions and survive reload", async ({page}) => {
-  await page.goto("/behavioral");
+  await page.goto(mountedPath("/behavioral"));
   await page.getByRole("button", {name: "Add a story", exact: true}).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Story title").fill("Unblocking the release");
@@ -92,7 +93,7 @@ test("STAR stories link to multiple questions and survive reload", async ({page}
   await expect(page.getByRole("button", {name: "Unblocking the release"})).toHaveCount(2);
 });
 test("Behavioral AI practice saves ordered transcripts and feedback", async ({page}) => {
-  await page.goto("/interviews?type=behavioral&question=team-collaboration&timed=false");
+  await page.goto(mountedPath("/interviews?type=behavioral&question=team-collaboration&timed=false"));
   await expect(page.getByLabel("Opening question")).toHaveValue("team-collaboration");
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page).toHaveURL(/\/interviews\/[a-f0-9-]+/);
@@ -109,7 +110,7 @@ test("Behavioral AI practice saves ordered transcripts and feedback", async ({pa
   await page.reload(); await expect(page.getByText("I paired with a teammate to fix an integration issue.", {exact: true})).toBeVisible();
 });
 test("Interrupted coding sessions resume without duplicate openings", async ({page}) => {
-  await page.goto("/interviews?type=coding&question=two-sum");
+  await page.goto(mountedPath("/interviews?type=coding&question=two-sum"));
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page).toHaveURL(/\/interviews\/[a-f0-9-]+/);
   const roomUrl = page.url();
@@ -117,7 +118,7 @@ test("Interrupted coding sessions resume without duplicate openings", async ({pa
   await page.getByLabel("Solution code", {exact: true}).fill("def twoSum(nums, target):\n    return [0, 1]");
   await page.getByRole("link", {name: "Leave and save for later"}).click();
   await expect(page.getByRole("heading", {name: "Pick up a previous session"})).toBeVisible();
-  await page.goto("/history");
+  await page.goto(mountedPath("/history"));
   await expect(page.getByText("Interrupted", {exact: true})).toBeVisible();
   await page.getByRole("link", {name: "Resume", exact: true}).click();
   await expect(page).toHaveURL(roomUrl);
@@ -125,7 +126,7 @@ test("Interrupted coding sessions resume without duplicate openings", async ({pa
   await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue("def twoSum(nums, target):\n    return [0, 1]");
 });
 test("Retired question links still preserve drafts without a local runner", async ({page}) => {
-  await page.goto("/coding/contains-duplicate");
+  await page.goto(mountedPath("/coding/contains-duplicate"));
   await page.getByLabel("Solution code", {exact: true}).fill("# saved work on a retired question");
   await expect(page.getByRole("link", {name: "Practice on LeetCode"})).toHaveAttribute("href", "https://leetcode.com/problems/contains-duplicate/");
   await expect(page.getByRole("button", {name: /Run examples|Submit tests/})).toHaveCount(0);
@@ -135,7 +136,7 @@ test("Retired question links still preserve drafts without a local runner", asyn
 });
 test("Mobile navigation and themes remain usable", async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
-  await page.goto("/");
+  await page.goto(mountedPath("/"));
   await page.getByRole("button", {name: "Open navigation"}).click();
   await page.getByRole("link", {name: "Behavioral prep", exact: true}).click();
   await expect(page.getByRole("heading", {name: "Find the story behind your skills."})).toBeVisible();
@@ -145,15 +146,15 @@ test("Mobile navigation and themes remain usable", async ({page}) => {
   expect(overflowing).toBe(false);
 });
 test("Unconfigured and cross-origin API requests cannot access private data", async ({request}) => {
-  const read = await request.get("/api/workspace"); expect(read.status()).toBe(503);
-  const write = await request.patch("/api/workspace", {headers: {Origin: "https://untrusted.example"}, data: {kind: "profile", value: {}}}); expect(write.status()).toBe(403);
-  const run = await request.post("/api/execution", {headers: {Origin: "http://127.0.0.1:3100"}, data: {problemId: "two-sum", language: "python", code: "code", mode: "run"}}); expect(run.status()).toBe(404);
+  const read = await request.get(mountedPath("/api/workspace")); expect(read.status()).toBe(503);
+  const write = await request.patch(mountedPath("/api/workspace"), {headers: {Origin: "https://untrusted.example"}, data: {kind: "profile", value: {}}}); expect(write.status()).toBe(403);
+  const run = await request.post(mountedPath("/api/execution"), {headers: {Origin: "http://127.0.0.1:3100"}, data: {problemId: "two-sum", language: "python", code: "code", mode: "run"}}); expect(run.status()).toBe(404);
 });
 
 test("Monaco loads from local assets and edits save without editor errors", async ({page}) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto("/coding/two-sum");
+  await page.goto(mountedPath("/coding/two-sum"));
   await page.getByLabel("Solution code", {exact: true}).fill("");
   await page.getByRole("button", {name: "Use Monaco editor", exact: true}).click();
   const editor = page.locator(".monaco-editor textarea");
@@ -181,7 +182,7 @@ test("Conversational AI answers constraint questions and saves an evidence-based
       await route.fulfill({json: {feedback: {source: "agent", summary: "You clarified the input assumptions.", strengths: ["Checked the empty input case."], improvements: ["Explain your approach next."], evidence: ["Asked whether nums can be empty."], nextActions: ["Discuss complexity."], dimensions: [{name: "Clarification", observation: "Asked about the boundaries before coding."}]}}});
     }
   });
-  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
+  await page.goto(mountedPath("/interviews?question=contains-duplicate-ii&timed=false"));
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate II");
   await page.getByLabel("Coding language").selectOption("typescript");
@@ -202,7 +203,7 @@ test("AI provider failure saves the candidate turn once, supports retry, and pre
     replies++;
     return replies === 1 ? route.fulfill({status: 503, json: {error: "The AI connection failed. Your work is saved."}}) : route.fulfill({json: {text: "Empty inputs are allowed."}});
   });
-  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
+  await page.goto(mountedPath("/interviews?question=contains-duplicate-ii&timed=false"));
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await page.getByLabel("Your response", {exact: true}).fill("Can it be empty?");
   await page.getByRole("button", {name: "Send response"}).click();
@@ -225,7 +226,7 @@ test("Earlier interrupted sessions resume directly with AI and preserve saved wo
   workspace.sessions.push(session);
   workspace.drafts[draftKey("two-sum", "python")] = {problemId: "two-sum", language: "python", code: "def twoSum(nums, target):\n    # saved before resuming\n    pass", updatedAt: now};
   await page.addInitScript(serialized => localStorage.setItem("interview-pal.workspace.v1", serialized), JSON.stringify(workspace));
-  await page.goto(`/interviews/${id}`);
+  await page.goto(mountedPath(`/interviews/${id}`));
   await expect(page.getByText("OpenAI interviewer", {exact: true})).toBeVisible();
   await expect(page.locator(".transcript-message.interviewer")).toHaveCount(1);
   await expect(page.getByRole("log")).toContainText("Saved opening question");
@@ -240,7 +241,7 @@ test("Earlier interrupted sessions resume directly with AI and preserve saved wo
 
 test("Starting an interview requires OpenAI and offers no scripted fallback", async ({page}) => {
   await page.route("**/api/config", route => route.fulfill({json: {runnerConfigured: false, agentConfigured: false}}));
-  await page.goto("/interviews");
+  await page.goto(mountedPath("/interviews"));
   await expect(page.getByText("OpenAI not connected", {exact: true})).toBeVisible();
   await expect(page.getByRole("button", {name: "Enter practice room"})).toBeDisabled();
   await expect(page.getByRole("combobox", {name: "Interviewer", exact: true})).toHaveCount(0);
@@ -253,7 +254,7 @@ test("Typed code verification is preserved in the completed review", async ({pag
     if (body.action === "feedback") return route.fulfill({json: {feedback: {source: "agent", summary: "Python passed the supplied checks.", strengths: [], improvements: [], evidence: ["Duplicate case passed."], nextActions: [], dimensions: []}}});
     return route.fulfill({json: {text: "The supplied test passed.", attempts: [{id: crypto.randomUUID(), provider: "openai-code-interpreter", sessionId: body.session.id, problemId: body.session.questionId, problemVersion: 1, language: "python", code: body.context.code, mode: "submit", createdAt: new Date().toISOString(), result: {status: "passed", stdout: "", tests: [{name: "Duplicate case", passed: true, expected: true, actual: true}]}}]}});
   });
-  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
+  await page.goto(mountedPath("/interviews?question=contains-duplicate-ii&timed=false"));
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate II");
   await page.getByLabel("Solution code", {exact: true}).fill("def containsNearbyDuplicate(nums, k): return any(nums[i] == nums[j] and j - i <= k for i in range(len(nums)) for j in range(i + 1, len(nums)))");
@@ -270,7 +271,7 @@ test("Typed code verification is preserved in the completed review", async ({pag
 
 
 test("All 150 interview questions are available, including class-design tasks and saved drafts", async ({page}) => {
-  await page.goto("/interviews?question=lru-cache&timed=false");
+  await page.goto(mountedPath("/interviews?question=lru-cache&timed=false"));
   await expect(page.getByLabel("Problem", {exact: true}).locator("option")).toHaveCount(150);
   await expect(page.getByLabel("Problem", {exact: true})).toHaveValue("lru-cache");
   await page.getByLabel("Focus area").selectOption("Graph General");
@@ -288,7 +289,7 @@ test("All 150 interview questions are available, including class-design tasks an
   await page.getByRole("button", {name: "Finish session"}).click();
   await expect(page).toHaveURL(/\/history\//);
   await expect(page.getByRole("heading", {name: /Evaluate Division/})).toBeVisible();
-  await page.goto("/coding/lru-cache");
+  await page.goto(mountedPath("/coding/lru-cache"));
   await expect(page.locator(".problem-prompt")).toContainText("least recently used");
   await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/class LRUCache:[\s\S]*def __init__\(self, capacity: int\)/);
   await page.getByLabel("Solution code", {exact: true}).fill("# Write or paste your Python solution here.\n");
@@ -309,7 +310,7 @@ test("LLM reasoning judgments are clearly labeled and survive saved reviews", as
     const attempts = body.session.transcript.some((e: {text: string}) => e.text.includes("Please judge")) ? [{id: crypto.randomUUID(), provider: "openai-judge", sessionId: body.session.id, problemId: body.session.questionId, problemVersion: 1, language: "typescript", code: body.context.code, mode: "submit", createdAt: new Date().toISOString(), result: {status: "reviewed", stdout: "", tests: [], assessment: {method: "llm-review", verdict: "inconclusive", summary: "Required cache methods are incomplete."}}}] : [];
     return route.fulfill({json: {text: "This is a reasoning assessment; the TypeScript was not executed.", attempts}});
   });
-  await page.goto("/interviews?question=lru-cache&timed=false");
+  await page.goto(mountedPath("/interviews?question=lru-cache&timed=false"));
   await page.getByLabel("Coding language").selectOption("typescript");
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await page.getByLabel("Solution code", {exact: true}).fill("class LRUCache {}");

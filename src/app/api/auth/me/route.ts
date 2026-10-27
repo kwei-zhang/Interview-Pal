@@ -1,4 +1,4 @@
-import { assertAccountBinding, requireUser } from "@/lib/server/supabase";
+import { assertAccountBinding, requireUser } from "@/lib/server/accounts";
 import { errorResponse } from "@/lib/server/http";
 export async function GET(request: Request) {
   try {

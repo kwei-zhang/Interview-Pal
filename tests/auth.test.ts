@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { signupSchema } from "../src/lib/auth";
 import { createAccountFetch } from "../src/lib/account-client";
-import { assertAccountBinding } from "../src/lib/server/supabase";
-import { authFailure, authSiteUrl } from "../src/lib/server/auth";
+import { assertAccountBinding } from "../src/lib/server/accounts";
+import { authFailure, authSiteUrl, passwordRecoverySiteUrl } from "../src/lib/server/auth";
 import { assertSameOrigin, HttpError } from "../src/lib/server/http";
 import { appPath } from "../src/lib/paths";
 
@@ -41,6 +41,26 @@ test("Auth email redirects require a configured production origin", () => {
   } finally {if (previous === undefined) delete process.env.AUTH_SITE_URL; else process.env.AUTH_SITE_URL = previous;}
 });
 
+test("Preview recovery stays on its trusted deployment; production keeps the canonical origin", () => {
+  const keys = ["AUTH_SITE_URL", "VERCEL_ENV", "VERCEL_URL"] as const;
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  const request = new Request("https://attacker.example/api/auth/forgot-password", {headers: {"x-forwarded-host": "attacker.example"}});
+  try {
+    process.env.AUTH_SITE_URL = "https://interview.example";
+    process.env.VERCEL_ENV = "preview";
+    process.env.VERCEL_URL = "interview-preview.vercel.app";
+    assert.equal(passwordRecoverySiteUrl(request), "https://interview-preview.vercel.app");
+    for (const invalid of ["attacker.example", "https://interview-preview.vercel.app", "interview-preview.vercel.app@attacker.example", ""]) {
+      process.env.VERCEL_URL = invalid;
+      assert.throws(() => passwordRecoverySiteUrl(request), /preview URL/);
+    }
+    process.env.VERCEL_ENV = "production";
+    assert.equal(passwordRecoverySiteUrl(request), "https://interview.example");
+  } finally {
+    for (const key of keys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key]; }
+  }
+});
+
 test("Subpath URLs preserve root deployments and do not double-prefix requests", () => {
   assert.equal(appPath("/", "/interview"), "/interview");
   assert.equal(appPath("/api/workspace", "/interview"), "/interview/api/workspace");
@@ -66,17 +86,17 @@ test("Proxied mutations accept the configured public origin but reject forged fo
 test("Signup errors distinguish email setup, password requirements, and throttling without exposing provider details", t => {
   const logged: string[] = [];
   t.mock.method(console, "warn", (value: string) => logged.push(value));
-  assert.throws(() => authFailure({status: 400, code: "email_address_not_authorized"}, "Fallback", "signup"),
-    (error: unknown) => error instanceof HttpError && error.status === 503 && error.code === "email_address_not_authorized" && error.message.includes("custom SMTP"));
+  assert.throws(() => authFailure({status: 400, code: "email_not_confirmed"}, "Fallback", "signup"),
+    (error: unknown) => error instanceof HttpError && error.status === 403 && error.code === "email_not_confirmed" && error.message.includes("Verify your email"));
   assert.throws(() => authFailure({status: 422, code: "weak_password"}, "Fallback", "signup"),
     (error: unknown) => error instanceof HttpError && error.status === 400 && error.message.includes("password requirements"));
-  assert.throws(() => authFailure({status: 429, code: "over_email_send_rate_limit"}, "Fallback", "signup"),
+  assert.throws(() => authFailure({status: 429, code: "over_request_rate_limit"}, "Fallback", "signup"),
     (error: unknown) => error instanceof HttpError && error.status === 429 && error.message.includes("account emails"));
   const providerError = {status: 400, code: "private@example.test", message: "secret password and invitation code"};
   assert.throws(() => authFailure(providerError, "Safe fallback", "signup"),
     (error: unknown) => error instanceof HttpError && error.message === "Safe fallback" && error.code === "auth_request_rejected");
   assert.equal(logged.length, 4);
-  assert.equal(JSON.parse(logged[0]).code, "email_address_not_authorized");
+  assert.equal(JSON.parse(logged[0]).code, "email_not_confirmed");
   assert.equal(JSON.parse(logged[3]).code, "unclassified");
   assert.doesNotMatch(logged.join(""), /private@example|secret password|invitation code/);
 });

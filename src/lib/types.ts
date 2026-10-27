@@ -14,7 +14,7 @@ export interface Problem {
   collectionId: string;
   runnable: boolean;
 }
-export interface ProblemExample { name: string; args: Json[]; expected: Json }
+interface ProblemExample { name: string; args: Json[]; expected: Json }
 export interface ProblemDefinition {
   id: string;
   version: number;
@@ -60,7 +60,7 @@ export interface InterviewSession {
   // "mock" is retained only to read historical sessions; all new/resumed sessions use "agent".
   adapter: "mock" | "agent";
 }
-export interface TestResult {name: string; input?: string; passed: boolean; actual?: Json; expected?: Json; error?: string}
+interface TestResult {name: string; input?: string; passed: boolean; actual?: Json; expected?: Json; error?: string}
 export interface ExecutionResult {
   status: "queued" | "running" | "passed" | "failed" | "reviewed" | "error" | "timeout";
   tests: TestResult[]; stdout: string; error?: string;

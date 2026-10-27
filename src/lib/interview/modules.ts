@@ -2,7 +2,7 @@ import { problems } from "../data/catalog";
 import { behavioralQuestions } from "../data/behavioral";
 import type { InterviewType, Feedback } from "../types";
 
-export interface InterviewModule {
+interface InterviewModule {
   id: InterviewType;
   roleId: string;
   title: string;

@@ -1,3 +1,4 @@
+import {mountedPath} from "../helpers/paths";
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({page}) => {
@@ -53,7 +54,7 @@ for (const type of ["coding", "behavioral"]) {
   test(`${type} opens the microphone and starts the interviewer automatically; mute and resume work`, async ({page}) => {
     let voiceRequests = 0;
     page.on("request", request => {if (request.url().endsWith("/api/interview-agent") && request.postDataJSON().action === "voice") voiceRequests++;});
-    await page.goto(`/interviews?type=${type}`);
+    await page.goto(mountedPath(`/interviews?type=${type}`));
     await page.getByRole("button", {name: "Enter practice room"}).click();
     await expect(page.getByRole("button", {name: "Stop microphone"})).toBeVisible();
     await expect(page.getByRole("log")).toContainText("Hello! Let's begin");
@@ -78,7 +79,7 @@ for (const type of ["coding", "behavioral"]) {
 
 test("Failed automatic voice connection releases the microphone and allows typed chat", async ({page}) => {
   await page.route("**/api/interview-agent", route => route.fulfill({json: route.request().postDataJSON().action === "voice" ? {error: "Voice provider unavailable"} : {text: "Yes, empty inputs are allowed."}, status: route.request().postDataJSON().action === "voice" ? 503 : 200}));
-  await page.goto("/interviews?question=contains-duplicate-ii");
+  await page.goto(mountedPath("/interviews?question=contains-duplicate-ii"));
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page.locator(".inline-alert[role=alert]")).toContainText("Voice provider unavailable");
   await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate II");
@@ -89,7 +90,7 @@ test("Failed automatic voice connection releases the microphone and allows typed
 });
 
 test("Leaving while microphone permission is pending cancels startup and releases a late stream", async ({page}) => {
-  await page.goto("/interviews");
+  await page.goto(mountedPath("/interviews"));
   await page.evaluate(() => {(window as unknown as {voiceTest: {delayPermission: boolean}}).voiceTest.delayPermission = true;});
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as {voiceTest: {captures: number}}).voiceTest.captures)).toBe(1);
@@ -110,7 +111,7 @@ test("Voice verification uses the current snapshot once, returns tool output, an
     expect(body.context.language).toBe("python");
     return route.fulfill({json: {attempts: [{id: crypto.randomUUID(), provider: "openai-code-interpreter", sessionId: body.session.id, problemId: body.session.questionId, problemVersion: 1, language: "python", code: body.context.code, mode: "submit", createdAt: new Date().toISOString(), result: {status: "passed", stdout: "", tests: [{name: "Duplicate case", passed: true, expected: true, actual: true}]}}]}});
   });
-  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
+  await page.goto(mountedPath("/interviews?question=contains-duplicate-ii&timed=false"));
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page.getByRole("button", {name: "Stop microphone"})).toBeVisible();
   await page.getByLabel("Solution code", {exact: true}).fill("def containsNearbyDuplicate(nums, k):\n    return any(nums[i] == nums[j] and j - i <= k for i in range(len(nums)) for j in range(i + 1, len(nums)))");

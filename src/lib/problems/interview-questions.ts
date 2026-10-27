@@ -4,7 +4,7 @@ import { starterCode, structurePrelude } from "./function-starters";
 import { nodePrelude, renderStarter, starterContracts, type StarterContract } from "./starters";
 import type { Language } from "../types";
 
-export interface CodingInterviewQuestion {
+interface CodingInterviewQuestion {
   id: string;
   prompt: string;
   constraints: string[];

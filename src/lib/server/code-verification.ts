@@ -37,7 +37,7 @@ with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
 
 export const RESULT_MARKER = "__IP_JUDGE_CASES__";
 const caseSchema = z.object({name: z.string().min(1).max(120), entrypoint: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/), input: z.string().max(1000), expected: z.json(), comparison: z.enum(["exact", "unordered-items", "unordered-groups"])}).strict();
-export const judgePlanSchema = z.object({
+const judgePlanSchema = z.object({
   verdict: z.enum(["likely-correct", "incorrect", "inconclusive"]), summary: z.string().min(1).max(2000),
   testCode: z.string().max(16000), cases: z.array(caseSchema).max(8),
 }).strict();

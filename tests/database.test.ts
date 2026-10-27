@@ -1,36 +1,20 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { authFixture } from "./helpers/auth-database";
+import {setupNeon, asNeonUser} from "./helpers/neon-database";
+import {loadWorkspace} from "../src/lib/server/workspace";
 
 const owner = "11111111-1111-4111-8111-111111111111";
 const other = "22222222-2222-4222-8222-222222222222";
 const storyId = "33333333-3333-4333-8333-333333333333";
 const sessionId = "44444444-4444-4444-8444-444444444444";
 const db = new PGlite();
-async function signIn(user: string | null, role = "authenticated") {
-  await db.exec("reset role");
-  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [user || ""]);
-  await db.exec(`set role ${role}`);
-}
-before(async () => {
-  await db.exec(authFixture);
-  await db.exec(readFileSync("supabase/migrations/202610100001_foundation.sql", "utf8"));
-  await db.exec(readFileSync("supabase/migrations/202610100002_interview_agent.sql", "utf8"));
-  await db.exec(readFileSync("supabase/seed.sql", "utf8"));
-  await db.exec("update public.problem_definitions set data = data || '{\"tests\":[{\"name\":\"public example\",\"args\":[],\"expected\":0,\"example\":true},{\"name\":\"retired case\",\"args\":[],\"expected\":1}]}'::jsonb where problem_id='contains-duplicate'");
-  await db.exec(readFileSync("supabase/migrations/202610100003_llm_judging.sql", "utf8"));
-  await db.exec(readFileSync("supabase/migrations/202610100004_invite_only_users.sql", "utf8"));
-});
-after(async () => {await db.close();});
-
-test("LLM judging migration removes fixed suites and preserves public examples", async () => {
-  await db.exec("reset role");
-  const result = await db.query<{data: {examples: {name: string}[]; tests?: unknown}}>("select data from public.problem_definitions where problem_id='contains-duplicate'");
-  assert.equal(result.rows[0].data.tests, undefined);
-  assert.deepEqual(result.rows[0].data.examples.map(e => e.name), ["public example"]);
-});
+const signIn = async (user: string|null, role?: string) => {
+  if (role === 'anon') {await db.exec('reset role; set role anonymous_test');return;}
+  await asNeonUser(db,user);
+};
+before(async()=>{await setupNeon(db);await db.exec('create role anonymous_test nologin');});
+after(()=>db.close());
 
 test("Agent requests have separate persistent quotas and owner-only access", async () => {
   await signIn(owner);
@@ -63,6 +47,16 @@ test("Owner can save data; another account cannot read, update, or insert it", a
   await assert.rejects(db.query("select public.save_story($1,'{}',ARRAY[]::text[],now())", [storyId]), /row-level security/);
   await signIn(owner);
   assert.equal((await db.query<{data: {title: string}}>("select data from public.stories where id=$1", [storyId])).rows[0].data.title, "Private story");
+  const workspace = await loadWorkspace(db, owner);
+  assert.equal(workspace.profile.displayName, "Owner");
+  assert.equal(workspace.stories[0].title, "Private story");
+  assert.deepEqual(workspace.stories[0].questionIds, ["team-collaboration"]);
+  await signIn(other);
+  // Even an explicitly supplied other account UUID cannot bypass the aggregated read's RLS.
+  const blocked = await loadWorkspace(db, owner);
+  assert.equal(blocked.stories.length, 0);
+  assert.deepEqual(blocked.drafts, {});
+  assert.notEqual(blocked.profile.displayName, "Owner");
 });
 test("Story and question links commit atomically, and invalid links roll back", async () => {
   await signIn(owner);

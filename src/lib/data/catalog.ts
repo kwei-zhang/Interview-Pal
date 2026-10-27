@@ -14,5 +14,4 @@ export const problems: Problem[] = seed.map(p => ({...p, difficulty: p.difficult
 // retired questions in the active curriculum or its progress totals.
 export const archivedProblems: Problem[] = previousSeed.filter(p => !problems.some(current => current.id === p.id)).map(p => ({...p, topic: p.id === "generate-parentheses" ? "Backtracking" : p.topic, difficulty: p.difficulty as Problem["difficulty"], collectionId: "neetcode-150", runnable: true}));
 export const topics = [...new Set(problems.map(p => p.topic))];
-export const runnableProblems = problems.filter(p => p.runnable);
 export const problemById = (id: string) => problems.find(p => p.id === id) ?? archivedProblems.find(p => p.id === id);

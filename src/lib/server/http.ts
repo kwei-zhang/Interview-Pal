@@ -24,7 +24,7 @@ export function assertSameOrigin(request: Request): void {
   } catch { /* Unconfigured local preview still uses the request origin. */ }
   if (!origin || (origin !== `${url.protocol}//${host}` && origin !== publicOrigin)) throw new HttpError(403, "This request must come from the Interview Pal website.");
 }
-export async function readJson(request: Request, maxBytes = 500000): Promise<unknown> {
+export async function readBody(request: Request, maxBytes = 500000): Promise<string> {
   const declared = Number(request.headers.get("content-length") || 0);
   if (declared > maxBytes) throw new HttpError(413, "Request is too large.");
   if (!request.body) throw new HttpError(400, "A JSON request body is required.");
@@ -38,6 +38,10 @@ export async function readJson(request: Request, maxBytes = 500000): Promise<unk
     if (bytes > maxBytes) { await reader.cancel(); throw new HttpError(413, "Request is too large."); }
     chunks.push(value);
   }
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }
+  return Buffer.concat(chunks).toString("utf8");
+}
+export async function readJson(request: Request, maxBytes = 500000): Promise<unknown> {
+  const text = await readBody(request, maxBytes);
+  try { return JSON.parse(text); }
   catch { throw new HttpError(400, "Request body must be valid JSON."); }
 }
