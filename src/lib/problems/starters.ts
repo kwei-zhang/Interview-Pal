@@ -1,6 +1,6 @@
 import type { Language } from "../types";
 
-type ValueType = "int" | "float" | "bool" | "str" | "void" | "ints" | "matrix" | "strings" | "stringMatrix" | "list" | "lists" | "tree" | "randomNode" | "graphNode";
+type ValueType = "int" | "float" | "bool" | "str" | "void" | "ints" | "floats" | "matrix" | "strings" | "stringMatrix" | "list" | "lists" | "tree" | "randomNode" | "graphNode" | "nextNode" | "quadNode";
 type Parameter = readonly [name: string, type: ValueType];
 interface Method { name: string; parameters: readonly Parameter[]; returns: ValueType }
 export type StarterContract =
@@ -13,6 +13,79 @@ const cls = (name: string, parameters: readonly Parameter[], methods: readonly M
 
 // Task interfaces only: no implementation, selected data structure, or algorithm hint.
 export const starterContracts: Record<string, StarterContract> = {
+  "merge-sorted-array": fn("merge", [["nums1", "ints"], ["m", "int"], ["nums2", "ints"], ["n", "int"]], "void"),
+  "remove-element": fn("removeElement", [["nums", "ints"], ["val", "int"]], "int"),
+  "remove-duplicates-from-sorted-array": fn("removeDuplicates", [["nums", "ints"]], "int"),
+  "remove-duplicates-from-sorted-array-ii": fn("removeDuplicates", [["nums", "ints"]], "int"),
+  "majority-element": fn("majorityElement", [["nums", "ints"]], "int"),
+  "rotate-array": fn("rotate", [["nums", "ints"], ["k", "int"]], "void"),
+  "best-time-to-buy-and-sell-stock-ii": fn("maxProfit", [["prices", "ints"]], "int"),
+  "h-index": fn("hIndex", [["citations", "ints"]], "int"),
+  "insert-delete-getrandom-o1": cls("RandomizedSet", [], [method("insert", [["val", "int"]], "bool"), method("remove", [["val", "int"]], "bool"), method("getRandom", [], "int")]),
+  "candy": fn("candy", [["ratings", "ints"]], "int"),
+  "roman-to-integer": fn("romanToInt", [["s", "str"]], "int"),
+  "integer-to-roman": fn("intToRoman", [["num", "int"]], "str"),
+  "length-of-last-word": fn("lengthOfLastWord", [["s", "str"]], "int"),
+  "longest-common-prefix": fn("longestCommonPrefix", [["strs", "strings"]], "str"),
+  "reverse-words-in-a-string": fn("reverseWords", [["s", "str"]], "str"),
+  "zigzag-conversion": fn("convert", [["s", "str"], ["numRows", "int"]], "str"),
+  "find-the-index-of-the-first-occurrence-in-a-string": fn("strStr", [["haystack", "str"], ["needle", "str"]], "int"),
+  "text-justification": fn("fullJustify", [["words", "strings"], ["maxWidth", "int"]], "strings"),
+  "is-subsequence": fn("isSubsequence", [["s", "str"], ["t", "str"]], "bool"),
+  "minimum-size-subarray-sum": fn("minSubArrayLen", [["target", "int"], ["nums", "ints"]], "int"),
+  "substring-with-concatenation-of-all-words": fn("findSubstring", [["s", "str"], ["words", "strings"]], "ints"),
+  "game-of-life": fn("gameOfLife", [["board", "matrix"]], "void"),
+  "ransom-note": fn("canConstruct", [["ransomNote", "str"], ["magazine", "str"]], "bool"),
+  "isomorphic-strings": fn("isIsomorphic", [["s", "str"], ["t", "str"]], "bool"),
+  "word-pattern": fn("wordPattern", [["pattern", "str"], ["s", "str"]], "bool"),
+  "contains-duplicate-ii": fn("containsNearbyDuplicate", [["nums", "ints"], ["k", "int"]], "bool"),
+  "summary-ranges": fn("summaryRanges", [["nums", "ints"]], "strings"),
+  "minimum-number-of-arrows-to-burst-balloons": fn("findMinArrowShots", [["points", "matrix"]], "int"),
+  "simplify-path": fn("simplifyPath", [["path", "str"]], "str"),
+  "basic-calculator": fn("calculate", [["s", "str"]], "int"),
+  "reverse-linked-list-ii": fn("reverseBetween", [["head", "list"], ["left", "int"], ["right", "int"]], "list"),
+  "remove-duplicates-from-sorted-list-ii": fn("deleteDuplicates", [["head", "list"]], "list"),
+  "rotate-list": fn("rotateRight", [["head", "list"], ["k", "int"]], "list"),
+  "partition-list": fn("partition", [["head", "list"], ["x", "int"]], "list"),
+  "symmetric-tree": fn("isSymmetric", [["root", "tree"]], "bool"),
+  "construct-binary-tree-from-inorder-and-postorder-traversal": fn("buildTree", [["inorder", "ints"], ["postorder", "ints"]], "tree"),
+  "populating-next-right-pointers-in-each-node-ii": fn("connect", [["root", "nextNode"]], "nextNode"),
+  "flatten-binary-tree-to-linked-list": fn("flatten", [["root", "tree"]], "void"),
+  "path-sum": fn("hasPathSum", [["root", "tree"], ["targetSum", "int"]], "bool"),
+  "sum-root-to-leaf-numbers": fn("sumNumbers", [["root", "tree"]], "int"),
+  "binary-search-tree-iterator": cls("BSTIterator", [["root", "tree"]], [method("next", [], "int"), method("hasNext", [], "bool")]),
+  "count-complete-tree-nodes": fn("countNodes", [["root", "tree"]], "int"),
+  "lowest-common-ancestor-of-a-binary-tree": fn("lowestCommonAncestor", [["root", "tree"], ["p", "tree"], ["q", "tree"]], "tree"),
+  "average-of-levels-in-binary-tree": fn("averageOfLevels", [["root", "tree"]], "floats"),
+  "binary-tree-zigzag-level-order-traversal": fn("zigzagLevelOrder", [["root", "tree"]], "matrix"),
+  "minimum-absolute-difference-in-bst": fn("getMinimumDifference", [["root", "tree"]], "int"),
+  "evaluate-division": fn("calcEquation", [["equations", "stringMatrix"], ["values", "floats"], ["queries", "stringMatrix"]], "floats"),
+  "snakes-and-ladders": fn("snakesAndLadders", [["board", "matrix"]], "int"),
+  "minimum-genetic-mutation": fn("minMutation", [["startGene", "str"], ["endGene", "str"], ["bank", "strings"]], "int"),
+  "combinations": fn("combine", [["n", "int"], ["k", "int"]], "matrix"),
+  "n-queens-ii": fn("totalNQueens", [["n", "int"]], "int"),
+  "convert-sorted-array-to-binary-search-tree": fn("sortedArrayToBST", [["nums", "ints"]], "tree"),
+  "sort-list": fn("sortList", [["head", "list"]], "list"),
+  "construct-quad-tree": fn("construct", [["grid", "matrix"]], "quadNode"),
+  "maximum-sum-circular-subarray": fn("maxSubarraySumCircular", [["nums", "ints"]], "int"),
+  "search-insert-position": fn("searchInsert", [["nums", "ints"], ["target", "int"]], "int"),
+  "find-peak-element": fn("findPeakElement", [["nums", "ints"]], "int"),
+  "find-first-and-last-position-of-element-in-sorted-array": fn("searchRange", [["nums", "ints"], ["target", "int"]], "ints"),
+  "ipo": fn("findMaximizedCapital", [["k", "int"], ["w", "int"], ["profits", "ints"], ["capital", "ints"]], "int"),
+  "find-k-pairs-with-smallest-sums": fn("kSmallestPairs", [["nums1", "ints"], ["nums2", "ints"], ["k", "int"]], "matrix"),
+  "add-binary": fn("addBinary", [["a", "str"], ["b", "str"]], "str"),
+  "single-number-ii": fn("singleNumber", [["nums", "ints"]], "int"),
+  "bitwise-and-of-numbers-range": fn("rangeBitwiseAnd", [["left", "int"], ["right", "int"]], "int"),
+  "palindrome-number": fn("isPalindrome", [["x", "int"]], "bool"),
+  "factorial-trailing-zeroes": fn("trailingZeroes", [["n", "int"]], "int"),
+  "sqrtx": fn("mySqrt", [["x", "int"]], "int"),
+  "max-points-on-a-line": fn("maxPoints", [["points", "matrix"]], "int"),
+  "triangle": fn("minimumTotal", [["triangle", "matrix"]], "int"),
+  "minimum-path-sum": fn("minPathSum", [["grid", "matrix"]], "int"),
+  "unique-paths-ii": fn("uniquePathsWithObstacles", [["obstacleGrid", "matrix"]], "int"),
+  "best-time-to-buy-and-sell-stock-iii": fn("maxProfit", [["prices", "ints"]], "int"),
+  "best-time-to-buy-and-sell-stock-iv": fn("maxProfit", [["k", "int"], ["prices", "ints"]], "int"),
+  "maximal-square": fn("maximalSquare", [["matrix", "stringMatrix"]], "int"),
   "top-k-frequent-elements": fn("topKFrequent", [["nums", "ints"], ["k", "int"]], "ints"),
   "product-of-array-except-self": fn("productExceptSelf", [["nums", "ints"]], "ints"),
   "valid-sudoku": fn("isValidSudoku", [["board", "stringMatrix"]], "bool"),
@@ -152,9 +225,10 @@ export const starterContracts: Record<string, StarterContract> = {
 
 const types: Record<ValueType, {py: string; ts: string}> = {
   int: {py: "int", ts: "number"}, float: {py: "float", ts: "number"}, bool: {py: "bool", ts: "boolean"}, str: {py: "str", ts: "string"}, void: {py: "None", ts: "void"},
-  ints: {py: "List[int]", ts: "number[]"}, matrix: {py: "List[List[int]]", ts: "number[][]"}, strings: {py: "List[str]", ts: "string[]"}, stringMatrix: {py: "List[List[str]]", ts: "string[][]"},
+  ints: {py: "List[int]", ts: "number[]"}, floats: {py: "List[float]", ts: "number[]"}, matrix: {py: "List[List[int]]", ts: "number[][]"}, strings: {py: "List[str]", ts: "string[]"}, stringMatrix: {py: "List[List[str]]", ts: "string[][]"},
   list: {py: "Optional[ListNode]", ts: "ListNode | null"}, lists: {py: "List[Optional[ListNode]]", ts: "(ListNode | null)[]"}, tree: {py: "Optional[TreeNode]", ts: "TreeNode | null"},
   randomNode: {py: "Optional[Node]", ts: "Node | null"}, graphNode: {py: "Optional[Node]", ts: "Node | null"},
+  nextNode: {py: "Optional[Node]", ts: "Node | null"}, quadNode: {py: "Optional[Node]", ts: "Node | null"},
 };
 
 export function nodePrelude(contract: StarterContract, language: Language): string {
@@ -165,9 +239,11 @@ export function nodePrelude(contract: StarterContract, language: Language): stri
   if (used.has("tree")) structures.push(["TreeNode", [["val", "number", "0"], ["left", "TreeNode | null", "null"], ["right", "TreeNode | null", "null"]]]);
   if (used.has("randomNode")) structures.push(["Node", [["val", "number", "0"], ["next", "Node | null", "null"], ["random", "Node | null", "null"]]]);
   if (used.has("graphNode")) structures.push(["Node", [["val", "number", "0"], ["neighbors", "Node[]", "[]"]]]);
+  if (used.has("nextNode")) structures.push(["Node", [["val", "number", "0"], ["left", "Node | null", "null"], ["right", "Node | null", "null"], ["next", "Node | null", "null"]]]);
+  if (used.has("quadNode")) structures.push(["Node", [["val", "boolean", "false"], ["isLeaf", "boolean", "false"], ["topLeft", "Node | null", "null"], ["topRight", "Node | null", "null"], ["bottomLeft", "Node | null", "null"], ["bottomRight", "Node | null", "null"]]]);
   return structures.map(([name, fields]) => {
     if (language === "python") {
-      const params = fields.map(([field, , initial]) => `${field}=${initial === "null" || initial === "[]" ? "None" : initial}`).join(", ");
+      const params = fields.map(([field, , initial]) => `${field}=${initial === "null" || initial === "[]" ? "None" : initial === "false" ? "False" : initial}`).join(", ");
       const assignments = fields.map(([field, , initial]) => `        self.${field} = ${initial === "[]" ? `${field} if ${field} is not None else []` : field}`).join("\n");
       return `class ${name}:\n    def __init__(self, ${params}):\n${assignments}\n\n`;
     }

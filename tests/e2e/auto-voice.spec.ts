@@ -78,10 +78,10 @@ for (const type of ["coding", "behavioral"]) {
 
 test("Failed automatic voice connection releases the microphone and allows typed chat", async ({page}) => {
   await page.route("**/api/interview-agent", route => route.fulfill({json: route.request().postDataJSON().action === "voice" ? {error: "Voice provider unavailable"} : {text: "Yes, empty inputs are allowed."}, status: route.request().postDataJSON().action === "voice" ? 503 : 200}));
-  await page.goto("/interviews?question=contains-duplicate");
+  await page.goto("/interviews?question=contains-duplicate-ii");
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page.locator(".inline-alert[role=alert]")).toContainText("Voice provider unavailable");
-  await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate");
+  await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate II");
   expect(await page.evaluate(() => (window as unknown as {voiceTest: {track: {stopped: boolean}}}).voiceTest.track.stopped)).toBe(true);
   await page.getByLabel("Your response", {exact: true}).fill("Can the input be empty?");
   await page.getByRole("button", {name: "Send response"}).click();
@@ -106,14 +106,14 @@ test("Voice verification uses the current snapshot once, returns tool output, an
     const body = route.request().postDataJSON();
     if (body.action !== "verify") return route.fulfill({json: {sdp: "v=0\r\no=test-answer"}});
     checks++;
-    expect(body.context.code).toContain("len(set(nums))");
+    expect(body.context.code).toContain("any(nums[i] == nums[j]");
     expect(body.context.language).toBe("python");
     return route.fulfill({json: {attempts: [{id: crypto.randomUUID(), provider: "openai-code-interpreter", sessionId: body.session.id, problemId: body.session.questionId, problemVersion: 1, language: "python", code: body.context.code, mode: "submit", createdAt: new Date().toISOString(), result: {status: "passed", stdout: "", tests: [{name: "Duplicate case", passed: true, expected: true, actual: true}]}}]}});
   });
-  await page.goto("/interviews?question=contains-duplicate&timed=false");
+  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await expect(page.getByRole("button", {name: "Stop microphone"})).toBeVisible();
-  await page.getByLabel("Solution code", {exact: true}).fill("def containsDuplicate(nums):\n    return len(nums) != len(set(nums))");
+  await page.getByLabel("Solution code", {exact: true}).fill("def containsNearbyDuplicate(nums, k):\n    return any(nums[i] == nums[j] and j - i <= k for i in range(len(nums)) for j in range(i + 1, len(nums)))");
   await page.evaluate(() => {
     const state = (window as unknown as {voiceTest: {inject: (m: unknown) => void}}).voiceTest;
     const message = {type: "response.done", response: {status: "completed", output: [{type: "function_call", name: "verify_code", call_id: "call_verify", arguments: "{}"}]}};
@@ -124,7 +124,7 @@ test("Voice verification uses the current snapshot once, returns tool output, an
   const outputs = await page.evaluate(() => (window as unknown as {voiceTest: {toolOutputs: {call_id: string; output: string}[]}}).voiceTest.toolOutputs);
   expect(outputs).toHaveLength(1); expect(outputs[0].call_id).toBe("call_verify");
   expect(JSON.parse(outputs[0].output).status).toBe("passed");
-  await page.getByLabel("Solution code", {exact: true}).fill("def containsDuplicate(nums): return False");
+  await page.getByLabel("Solution code", {exact: true}).fill("def containsNearbyDuplicate(nums, k): return False");
   await expect(page.locator(".test-panel")).toContainText("earlier code snapshot");
   await page.reload();
   await expect(page.locator(".test-panel")).toContainText("1 / 1 tests");

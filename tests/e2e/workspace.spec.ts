@@ -22,9 +22,32 @@ test("Dashboard and complete curriculum support meaningful filters", async ({pag
   await expect(page.getByText("1–25 of 150 problems")).toBeVisible();
   await expect(page.getByRole("checkbox", {name: "Python checks"})).toHaveCount(0);
   await expect(page.locator("tbody tr")).toHaveCount(25);
+  await expect(page.locator("tbody tr").first()).toContainText("Merge Sorted Array");
+  await expect(page.getByLabel("Filter topic").locator("option")).toHaveCount(24);
+  await expect(page.getByRole("link", {name: "LeetCode study plan"}).last()).toHaveAttribute("href", "https://leetcode.com/studyplan/top-interview-150/");
   await page.getByLabel("Search coding problems").fill("3Sum");
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.getByRole("link", {name: /3Sum/})).toBeVisible();
+});
+test("New Top Interview 150 starters switch languages, reset, and preserve drafts", async ({page}) => {
+  await page.goto("/coding/merge-sorted-array");
+  const editor = page.getByLabel("Solution code", {exact: true});
+  await expect(editor).toHaveValue(/def merge\(nums1: List\[int\], m: int, nums2: List\[int\], n: int\) -> None:/);
+  await editor.fill("# my merge draft");
+  await page.getByLabel("Coding language").selectOption("javascript");
+  await expect(editor).toHaveValue(/function merge\(nums1, m, nums2, n\)/);
+  await page.getByLabel("Coding language").selectOption("typescript");
+  await expect(editor).toHaveValue(/function merge\(nums1: number\[\], m: number, nums2: number\[\], n: number\): void/);
+  await editor.fill("// temporary edit");
+  await page.getByRole("button", {name: "Reset starter"}).click();
+  await page.getByRole("button", {name: "Confirm reset"}).click();
+  await expect(editor).toHaveValue(/function merge/);
+  await page.getByLabel("Coding language").selectOption("python");
+  await expect(editor).toHaveValue("# my merge draft");
+  await page.reload();
+  await expect(editor).toHaveValue("# my merge draft");
+  await page.getByRole("link", {name: "Practice this in an interview"}).click();
+  await expect(page.getByLabel("Problem", {exact: true})).toHaveValue("merge-sorted-array");
 });
 test("Drafts by language, notes, progress and review flags survive reload", async ({page}) => {
   await page.goto("/coding/two-sum");
@@ -101,13 +124,14 @@ test("Interrupted coding sessions resume without duplicate openings", async ({pa
   await expect(page.locator(".transcript-message.interviewer")).toHaveCount(1);
   await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue("def twoSum(nums, target):\n    return [0, 1]");
 });
-test("Coding practice links to LeetCode and preserves drafts without a local runner", async ({page}) => {
+test("Retired question links still preserve drafts without a local runner", async ({page}) => {
   await page.goto("/coding/contains-duplicate");
-  await page.getByLabel("Solution code", {exact: true}).fill("def containsDuplicate(nums):\n    return len(nums) != len(set(nums))");
+  await page.getByLabel("Solution code", {exact: true}).fill("# saved work on a retired question");
   await expect(page.getByRole("link", {name: "Practice on LeetCode"})).toHaveAttribute("href", "https://leetcode.com/problems/contains-duplicate/");
   await expect(page.getByRole("button", {name: /Run examples|Submit tests/})).toHaveCount(0);
   await expect(page.locator(".test-result")).toHaveCount(0);
-  await page.reload(); await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/len\(set\(nums\)\)/);
+  await page.reload();
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue("# saved work on a retired question");
 });
 test("Mobile navigation and themes remain usable", async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
@@ -150,25 +174,25 @@ test("Conversational AI answers constraint questions and saves an evidence-based
     expect(body.session.adapter).toBe("agent"); expect(body.session.scratchpad).toBe("");
     if (body.action === "reply") {
       expect(body.session.transcript.at(-1).text).toBe("Can nums be empty? What are the constraints?");
-      expect(body.context.language).toBe("typescript"); expect(body.context.code).toContain("containsDuplicate");
-      await route.fulfill({json: {text: "Yes. Empty input is allowed; return false. There can be up to 100,000 elements."}});
+      expect(body.context.language).toBe("typescript"); expect(body.context.code).toContain("containsNearbyDuplicate");
+      await route.fulfill({json: {text: "Yes. Empty input returns false; k is nonnegative."}});
     } else {
       expect(body.action).toBe("feedback");
       await route.fulfill({json: {feedback: {source: "agent", summary: "You clarified the input assumptions.", strengths: ["Checked the empty input case."], improvements: ["Explain your approach next."], evidence: ["Asked whether nums can be empty."], nextActions: ["Discuss complexity."], dimensions: [{name: "Clarification", observation: "Asked about the boundaries before coding."}]}}});
     }
   });
-  await page.goto("/interviews?question=contains-duplicate&timed=false");
+  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
   await page.getByRole("button", {name: "Enter practice room"}).click();
-  await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate");
+  await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate II");
   await page.getByLabel("Coding language").selectOption("typescript");
   await page.getByLabel("Your response", {exact: true}).fill("Can nums be empty? What are the constraints?");
   await page.getByRole("button", {name: "Send response"}).click();
-  await expect(page.getByRole("log")).toContainText("100,000 elements");
+  await expect(page.getByRole("log")).toContainText("k is nonnegative");
   await page.getByRole("button", {name: "Finish session"}).click();
   await expect(page).toHaveURL(/\/history\/[a-f0-9-]+/);
   await expect(page.getByText("You clarified the input assumptions.")).toBeVisible();
   await expect(page.getByText("Asked about the boundaries before coding.")).toBeVisible();
-  await page.reload(); await expect(page.getByText("100,000 elements", {exact: false})).toBeVisible();
+  await page.reload(); await expect(page.getByText("k is nonnegative", {exact: false})).toBeVisible();
 });
 
 test("AI provider failure saves the candidate turn once, supports retry, and preserves interrupted work", async ({page}) => {
@@ -178,7 +202,7 @@ test("AI provider failure saves the candidate turn once, supports retry, and pre
     replies++;
     return replies === 1 ? route.fulfill({status: 503, json: {error: "The AI connection failed. Your work is saved."}}) : route.fulfill({json: {text: "Empty inputs are allowed."}});
   });
-  await page.goto("/interviews?question=contains-duplicate&timed=false");
+  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
   await page.getByRole("button", {name: "Enter practice room"}).click();
   await page.getByLabel("Your response", {exact: true}).fill("Can it be empty?");
   await page.getByRole("button", {name: "Send response"}).click();
@@ -229,10 +253,10 @@ test("Typed code verification is preserved in the completed review", async ({pag
     if (body.action === "feedback") return route.fulfill({json: {feedback: {source: "agent", summary: "Python passed the supplied checks.", strengths: [], improvements: [], evidence: ["Duplicate case passed."], nextActions: [], dimensions: []}}});
     return route.fulfill({json: {text: "The supplied test passed.", attempts: [{id: crypto.randomUUID(), provider: "openai-code-interpreter", sessionId: body.session.id, problemId: body.session.questionId, problemVersion: 1, language: "python", code: body.context.code, mode: "submit", createdAt: new Date().toISOString(), result: {status: "passed", stdout: "", tests: [{name: "Duplicate case", passed: true, expected: true, actual: true}]}}]}});
   });
-  await page.goto("/interviews?question=contains-duplicate&timed=false");
+  await page.goto("/interviews?question=contains-duplicate-ii&timed=false");
   await page.getByRole("button", {name: "Enter practice room"}).click();
-  await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate");
-  await page.getByLabel("Solution code", {exact: true}).fill("def containsDuplicate(nums): return len(nums) != len(set(nums))");
+  await expect(page.getByRole("log")).toContainText("Let's work on Contains Duplicate II");
+  await page.getByLabel("Solution code", {exact: true}).fill("def containsNearbyDuplicate(nums, k): return any(nums[i] == nums[j] and j - i <= k for i in range(len(nums)) for j in range(i + 1, len(nums)))");
   await page.getByRole("button", {name: "Ask interviewer to judge"}).click();
   await expect(page.locator(".test-panel")).toContainText("1 / 1 tests");
   await page.getByRole("button", {name: "Finish session"}).click();
@@ -241,7 +265,7 @@ test("Typed code verification is preserved in the completed review", async ({pag
   await page.reload();
   await expect(page.getByText("Python passed the supplied checks.")).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("interview-pal.workspace.v1")!));
-  expect(saved.attempts).toHaveLength(1); expect(saved.attempts[0].code).toContain("len(set(nums))");
+  expect(saved.attempts).toHaveLength(1); expect(saved.attempts[0].code).toContain("any(nums[i] == nums[j]");
 });
 
 
@@ -249,21 +273,21 @@ test("All 150 interview questions are available, including class-design tasks an
   await page.goto("/interviews?question=lru-cache&timed=false");
   await expect(page.getByLabel("Problem", {exact: true}).locator("option")).toHaveCount(150);
   await expect(page.getByLabel("Problem", {exact: true})).toHaveValue("lru-cache");
-  await page.getByLabel("Focus area").selectOption("Advanced Graphs");
+  await page.getByLabel("Focus area").selectOption("Graph General");
   await expect(page.getByLabel("Problem", {exact: true}).locator("option")).toHaveCount(6);
-  await page.getByLabel("Problem", {exact: true}).selectOption("alien-dictionary");
+  await page.getByLabel("Problem", {exact: true}).selectOption("evaluate-division");
   await page.getByRole("button", {name: "Enter practice room"}).click();
-  await expect(page.getByRole("heading", {name: "Alien Dictionary", exact: true})).toBeVisible();
-  await expect(page.locator(".problem-prompt")).toContainText("unknown alphabet");
+  await expect(page.getByRole("heading", {name: "Evaluate Division", exact: true})).toBeVisible();
+  await expect(page.locator(".problem-prompt")).toContainText("equations are consistent");
   await expect(page.getByLabel("Solution code", {exact: true})).toBeVisible();
-  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/def alienOrder\(words: List\[str\]\) -> str:/);
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/def calcEquation\(equations: List\[List\[str\]\], values: List\[float\], queries: List\[List\[str\]\]\) -> List\[float\]:/);
   await expect(page.getByRole("button", {name: "Ask interviewer to judge"})).toBeEnabled();
-  await page.getByLabel("Solution code", {exact: true}).fill("# saved alien dictionary approach");
+  await page.getByLabel("Solution code", {exact: true}).fill("# saved evaluate division approach");
   await page.reload();
-  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue("# saved alien dictionary approach");
+  await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue("# saved evaluate division approach");
   await page.getByRole("button", {name: "Finish session"}).click();
   await expect(page).toHaveURL(/\/history\//);
-  await expect(page.getByRole("heading", {name: /Alien Dictionary/})).toBeVisible();
+  await expect(page.getByRole("heading", {name: /Evaluate Division/})).toBeVisible();
   await page.goto("/coding/lru-cache");
   await expect(page.locator(".problem-prompt")).toContainText("least recently used");
   await expect(page.getByLabel("Solution code", {exact: true})).toHaveValue(/class LRUCache:[\s\S]*def __init__\(self, capacity: int\)/);

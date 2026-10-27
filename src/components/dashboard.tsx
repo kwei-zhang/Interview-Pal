@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, AudioLines, BookOpen, CalendarDays, CheckCircle2, Code2, Flame, Lightbulb, Play, Sparkles, Star, Target } from "lucide-react";
-import { problems, topics, problemById } from "@/lib/data/catalog";
+import { codingCollection, problems, topics, problemById } from "@/lib/data/catalog";
 import { useWorkspace } from "./workspace-provider";
 import { Badge, DifficultyBadge, EmptyState, PageHeading, SectionTitle, relativeDate } from "./ui";
 
@@ -17,7 +17,7 @@ export function Dashboard() {
   const recent = data.sessions.slice(0, 3);
   const focusTopics = [...topics].sort((a, b) => problems.filter(p => p.topic === b && progressFor(p.id).status === "solved").length - problems.filter(p => p.topic === a && progressFor(p.id).status === "solved").length).slice(0, 5);
   const metrics = [
-    {label: "Problems solved", value: solved, suffix: "/ 150", note: "Your NeetCode 150 journey", icon: Code2},
+    {label: "Problems solved", value: solved, suffix: `/ ${problems.length}`, note: "Your Top Interview 150 journey", icon: Code2},
     {label: "Stories in your bank", value: data.stories.length, suffix: "stories", note: "Experience worth sharing", icon: BookOpen},
     {label: "Interviews completed", value: completed.length, suffix: "sessions", note: "Practice builds confidence", icon: AudioLines},
     {label: "Weekly practice", value: weekCount, suffix: `/ ${data.profile.weeklyGoal}`, note: "Solved problems + completed sessions", icon: Flame},
@@ -33,7 +33,7 @@ export function Dashboard() {
         <div className="focus-item"><span className="focus-icon"><Star size={18}/></span><div><h3>{reviews.length ? `${reviews.length} ${reviews.length === 1 ? "problem" : "problems"} to revisit` : "Keep the tricky ones close"}</h3><p>{reviews.length ? reviews.slice(0, 2).map(p => p.title).join(" · ") : "Star a problem to add it to your review list"}</p><Badge tone="amber">Review later</Badge></div><Link href="/coding?review=true" className="icon-button" aria-label="View problems marked for review"><ArrowUpRight size={17}/></Link></div>
       </section>
       <section className="card card-padding"><SectionTitle title="Your coding journey" href="/coding" linkLabel="Explore"/>
-        <div className="overall-progress"><div className="progress-ring"><svg width="80" height="80" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface-soft)" strokeWidth="6"/><circle cx="40" cy="40" r="34" fill="none" stroke="var(--purple)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${solved / 150 * 213.6} 213.6`}/></svg><div className="progress-ring-label"><strong>{Math.round(solved / 150 * 100)}%</strong><small>complete</small></div></div><div><h3>NeetCode 150</h3><p>{solved} solved · {150 - solved} opportunities</p><Badge tone="purple">18 topic areas</Badge></div></div>
+        <div className="overall-progress"><div className="progress-ring"><svg width="80" height="80" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="34" fill="none" stroke="var(--surface-soft)" strokeWidth="6"/><circle cx="40" cy="40" r="34" fill="none" stroke="var(--purple)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${solved / problems.length * 213.6} 213.6`}/></svg><div className="progress-ring-label"><strong>{Math.round(solved / problems.length * 100)}%</strong><small>complete</small></div></div><div><h3>{codingCollection.name}</h3><p>{solved} solved · {problems.length - solved} opportunities</p><Badge tone="purple">{topics.length} topic areas</Badge></div></div>
         {focusTopics.map(topic => {const list = problems.filter(p => p.topic === topic), count = list.filter(p => progressFor(p.id).status === "solved").length; return <div className="topic-progress" key={topic}><strong>{topic}</strong><div className="progress-track"><i style={{width: `${count / list.length * 100}%`}}/></div><span>{count}/{list.length}</span></div>;})}
         <p className="progress-caption"><CheckCircle2 size={11} style={{display: "inline", marginRight: 5}}/>Progress follows the problems you mark as solved.</p>
       </section>

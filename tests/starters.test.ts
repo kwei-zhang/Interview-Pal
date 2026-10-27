@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { Script } from "node:vm";
 import ts from "typescript";
-import { problems } from "../src/lib/data/catalog";
+import { archivedProblems, problems } from "../src/lib/data/catalog";
 import { definitions } from "../src/lib/problems/definitions";
 import { interviewQuestion } from "../src/lib/problems/interview-questions";
 import { codeWithStarter, starterContracts } from "../src/lib/problems/starters";
 
 test("Every additional question has a complete function or class contract", () => {
-  assert.deepEqual(Object.keys(starterContracts).sort(), problems.filter(p => !definitions[p.id]).map(p => p.id).sort());
+  assert.deepEqual(Object.keys(starterContracts).sort(), [...problems, ...archivedProblems].filter(p => !definitions[p.id]).map(p => p.id).sort());
   for (const [id, contract] of Object.entries(starterContracts)) {
     const starters = interviewQuestion(id)!.starters;
     for (const source of Object.values(starters)) assert.ok(source.includes(contract.name), id);
@@ -49,6 +49,14 @@ test("Structural and mutating tasks expose their required node types and return 
   assert.match(starter("lru-cache").python, /def __init__\(self, capacity: int\)/);
   assert.match(starter("median-of-two-sorted-arrays").python, /-> float:/);
   assert.match(starter("surrounded-regions").typescript, /board: string\[\]\[\]\): void/);
+  assert.match(starter("merge-sorted-array").typescript, /function merge\(nums1: number\[\], m: number, nums2: number\[\], n: number\): void/);
+  assert.match(starter("average-of-levels-in-binary-tree").python, /-> List\[float\]:/);
+  assert.match(starter("evaluate-division").python, /values: List\[float\]/);
+  assert.match(starter("populating-next-right-pointers-in-each-node-ii").typescript, /public next: Node \| null = null/);
+  assert.match(starter("construct-quad-tree").typescript, /public isLeaf: boolean = false/);
+  for (const field of ["topLeft", "topRight", "bottomLeft", "bottomRight"]) assert.ok(starter("construct-quad-tree").python.includes(`self.${field} = ${field}`));
+  assert.match(starter("insert-delete-getrandom-o1").python, /class RandomizedSet:/);
+  assert.match(starter("binary-search-tree-iterator").python, /def __init__\(self, root: Optional\[TreeNode\]\)/);
 });
 
 test("Legacy placeholders upgrade without replacing empty or edited drafts", () => {

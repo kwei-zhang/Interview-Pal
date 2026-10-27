@@ -5,7 +5,7 @@ A private interview preparation workspace built with Next.js, TypeScript, Tailwi
 ## What is implemented
 
 - Dashboard with real progress, topic breakdowns, review items, and recent sessions.
-- All 150 NeetCode catalog entries, searchable by topic, difficulty, and progress. Metadata comes from the [official NeetCode repository](https://github.com/neetcode-gh/leetcode); prompts and public examples are independently authored.
+- All 150 [LeetCode Top Interview 150](https://leetcode.com/studyplan/top-interview-150/) questions in official study-plan order, searchable by 23 topics, difficulty, and progress. Catalog metadata was verified against the study plan on October 27, 2026; prompts and public examples are independently authored. Retired NeetCode questions remain accessible through existing links and saved sessions, without affecting current curriculum totals.
 - Practice all 150 problems on LeetCode, with links, notes, progress, and optional saved drafts here. All 150 questions have authored interview briefs and examples with Python, JavaScript, and TypeScript editors. All 150 support LLM judgment of the editor code. The LLM selects Python cases for OpenAI Code Interpreter; JavaScript and TypeScript receive reasoning reviews without execution. There are no bundled problem test suites.
 - Per-language code drafts, notes, attempts, progress, and separate review flags.
 - STAR stories with reflections, competency tags, and links to multiple questions. Twenty original behavioral questions.
@@ -28,6 +28,8 @@ npm run dev
 Open http://127.0.0.1:3000. Without Supabase variables, development on localhost provides a browser-local demo. Demo data survives reloads through localStorage. Interviews and Python verification require a server-side OpenAI API key. The localhost preview supports both; production requires private Supabase login. Production never enables the demo.
 
 Monaco assets are copied from the installed dependency to `public/vendor/monaco` during install/build, so the editor does not depend on a CDN. The plain editor toggle offers an accessible textarea and works well on mobile.
+
+The Top Interview 150 catalog update includes `supabase/migrations/202610270001_top_interview_150.sql`. Apply it before using new questions in a connected workspace; it preserves existing progress, drafts, sessions, and retired problem IDs. `npm run seed:generate` refreshes the fresh-install seed.
 
 ## Configure Supabase and invite-only accounts
 
@@ -105,6 +107,7 @@ Verify actual microphone permission behavior, audio playback, interruptions, rec
 - `src/lib/server/openai-interviewer.ts`: selects the prompt by session type and handles private OpenAI requests.
 - `src/lib/interview/browser-voice.ts`: microphone checks, browser recognition and synthesis. Unsupported/denied voice input leaves typed responses available.
 - `src/lib/server/code-verification.ts`: the interviewer verification tool, immutable Python execution driver, provider evidence validation, and cleanup.
+- `src/lib/data/top-interview-150.json`: verified study-plan metadata; `src/lib/problems/top-interview-briefs.ts` adds the new problem briefs.
 - `src/lib/problems/interview-questions.ts`: interview briefs and examples for all 150 problems, plus per-language starters and structural preludes.
 - `src/lib/problems/starters.ts`: problem-specific function signatures, class APIs, and node definitions for the additional 135 interview questions. Existing drafts are kept; untouched legacy placeholders upgrade automatically.
 - `src/lib/problems/definitions.ts`: the original 15 briefs and public examples, without fixed test suites.

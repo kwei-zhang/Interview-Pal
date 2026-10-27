@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown, CircleHelp, Code2, History, LayoutDashboard, Menu, Moon, Settings2, Sparkles, Sun, X, CloudOff, RefreshCw, LockKeyhole } from "lucide-react";
 import { useWorkspace } from "./workspace-provider";
 import { LoadingState } from "./ui";
+import { codingCollection, problems } from "@/lib/data/catalog";
 
 const navigation = [
   {href: "/", label: "Overview", icon: LayoutDashboard},
@@ -35,12 +36,12 @@ export function AppShell({children, email, admin = false}: {children: React.Reac
       <button className="icon-button mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X size={20}/></button>
       <div className="workspace-selector"><span className="workspace-avatar">SE</span><div><strong>My workspace</strong><small>Software engineering</small></div><ChevronDown size={14}/></div>
       <div className="nav-label">YOUR PRACTICE SPACE</div>
-      <nav aria-label="Main navigation">{navigation.map(({href, label, icon: Icon}) => <Link key={href} href={href} className={`nav-item ${(href === "/" ? pathname === "/" : pathname.startsWith(href)) ? "active" : ""}`}><Icon size={18}/><span>{label}</span>{href === "/coding" && <span className="nav-count">150</span>}</Link>)}</nav>
+      <nav aria-label="Main navigation">{navigation.map(({href, label, icon: Icon}) => <Link key={href} href={href} className={`nav-item ${(href === "/" ? pathname === "/" : pathname.startsWith(href)) ? "active" : ""}`}><Icon size={18}/><span>{label}</span>{href === "/coding" && <span className="nav-count">{problems.length}</span>}</Link>)}</nav>
       <div className="sidebar-bottom">
         {admin && <Link href="/admin" className={`nav-item ${pathname === "/admin" ? "active" : ""}`}><LockKeyhole size={18}/>Administration</Link>}
         <div className="sidebar-note"><Sparkles size={18}/><strong>Small steps. Strong answers.</strong><p>A little deliberate practice goes a long way.</p><Link href="/interviews">Start a session<ArrowUpRight size={15}/></Link></div>
         <Link href="/settings" className={`nav-item ${pathname === "/settings" ? "active" : ""}`}><Settings2 size={18}/>Settings</Link>
-        <a href="https://neetcode.io/roadmap" target="_blank" rel="noreferrer" className="nav-item"><CircleHelp size={18}/>NeetCode roadmap<ArrowUpRight size={14}/></a>
+        <a href={codingCollection.sourceUrl} target="_blank" rel="noreferrer" className="nav-item"><CircleHelp size={18}/>LeetCode study plan<ArrowUpRight size={14}/></a>
         <div className="sidebar-user"><span className="user-avatar">{(data.profile.displayName || email || "You").slice(0, 1).toUpperCase()}</span><div><strong>{data.profile.displayName || "Your workspace"}</strong><small>{mode === "demo" ? "Local demo · this browser" : email || "Private account"}</small></div><span className="online-dot"/></div>
       </div>
     </aside>

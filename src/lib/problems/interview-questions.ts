@@ -1,4 +1,5 @@
 import { definitions } from "./definitions";
+import { topInterviewBriefs } from "./top-interview-briefs";
 import { starterCode, structurePrelude } from "./function-starters";
 import { nodePrelude, renderStarter, starterContracts, type StarterContract } from "./starters";
 import type { Language } from "../types";
@@ -16,6 +17,7 @@ export interface CodingInterviewQuestion {
 // Original interview briefs. They define the task without exposing its solution.
 // Numeric limits omitted here are unspecified, not inferred from LeetCode.
 const briefs: Record<string, [string, string, string]> = {
+  ...topInterviewBriefs,
   "top-k-frequent-elements": ["Given an integer array and k, return the k values with the highest occurrence counts. Assume 1 <= k <= the number of distinct values and the set of top k values is unambiguous. Output order does not matter.", "nums = [7,7,7,2,2,9], k = 2", "[7,2]"],
   "product-of-array-except-self": ["For each index in an integer array, return the product of all values except the one at that index. Do not use division. Seek linear running time; discuss auxiliary space separately from the output. The array has at least two values and products fit a signed 32-bit integer.", "nums = [2,3,4]", "[12,8,6]"],
   "valid-sudoku": ["Check whether the filled cells of a 9 by 9 Sudoku board obey the rules: digits 1 through 9 cannot repeat in a row, column, or 3 by 3 box. A dot represents an empty cell. You are checking consistency, not whether the puzzle can be solved.", "An otherwise empty board has digit 5 in cells (0,0) and (0,4)", "false"],
