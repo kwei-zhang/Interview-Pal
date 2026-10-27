@@ -15,5 +15,5 @@ const statements = [
   ...Object.values(definitions).map(d => `insert into public.problem_definitions(problem_id,version,data) values (${sql(d.id)},${d.version},${sql(d)}::jsonb) on conflict (problem_id,version) do update set data=excluded.data;`),
   ...behavioralQuestions.map(q => `insert into public.behavioral_questions(id,role_id,data) values (${sql(q.id)},'software-engineer',${sql(q)}::jsonb) on conflict (id) do update set data=excluded.data;`),
 ];
-writeFileSync("supabase/seed.sql", statements.join("\n") + "\n");
+writeFileSync("neon/seed.sql", statements.join("\n") + "\n");
 console.log(`Generated SQL for ${problems.length} active and ${archivedProblems.length} archived problems, ${Object.keys(definitions).length} original problem definitions, and ${behavioralQuestions.length} behavioral questions.`);

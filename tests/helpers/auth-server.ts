@@ -4,13 +4,13 @@ import {createServer} from 'node:http';
 import {generateKeyPairSync,randomUUID,sign} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {temporaryPostgres} from './postgres';
-import {migrateSchema} from '../../scripts/lib/migration';
+import {applySchema} from '../../scripts/lib/schema';
 import {adminId,memberId} from './neon-database';
 
 type User={id:string;email:string;name:string;emailVerified:boolean;password:string};
 async function main() {
  const pg=await temporaryPostgres(54328),db=await pg.connect();
- await migrateSchema(db);await db.query(await readFile('supabase/seed.sql','utf8'));
+ await applySchema(db);await db.query(await readFile('neon/seed.sql','utf8'));
  await db.query(`insert into public.app_accounts(user_id,email,role,verified_at,legacy) values($1,'zhangkw0622@gmail.com','admin',now(),true),($2,'member@example.test','member',now(),true)`,[adminId,memberId]);
  await db.query("create role interview_test login; grant interview_app to interview_test");
  const users=new Map<string,User>(),sessions=new Map<string,string>(),mail=new Map<string,{code?:string;token?:string;redirectTo?:string;userId?:string}>();

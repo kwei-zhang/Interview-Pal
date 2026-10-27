@@ -1,11 +1,11 @@
 // Real PostgreSQL connections; no configured cloud database is contacted.
 import assert from 'node:assert/strict';
 import {temporaryPostgres} from '../tests/helpers/postgres';
-import {migrateSchema} from './lib/migration';
+import {applySchema} from './lib/schema';
 async function main() {
   const pg=await temporaryPostgres(),db=await pg.connect();
   try {
-    await migrateSchema(db);
+    await applySchema(db);
     await db.query("insert into public.app_accounts(user_id,email,role,verified_at) values('11111111-1111-4111-8111-111111111111','admin@example.test','admin',now())");
     await db.query("select set_config('app.user_id','11111111-1111-4111-8111-111111111111',false)");
     await db.query("select public.admin_create_invitation('race@example.test',repeat('a',64))");

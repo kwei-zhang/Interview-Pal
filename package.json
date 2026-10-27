@@ -14,9 +14,7 @@
     "test:auth": "playwright test --config playwright.auth.config.ts",
     "test:auth:server": "npm run build && next start --hostname 127.0.0.1 --port 3102",
     "test:invite-concurrency": "node --import tsx scripts/test-invite-concurrency.ts",
-    "db:migrate": "node --import tsx scripts/migrate-neon.ts",
-    "db:inspect-backup": "node --import tsx scripts/inspect-supabase-backup.ts",
-    "db:runtime-role": "node --import tsx scripts/provision-neon-runtime.ts"
+    "db:apply": "node --import tsx scripts/apply-schema.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

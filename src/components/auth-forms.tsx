@@ -94,13 +94,6 @@ export function AuthForm({mode, configured, token}: {mode: FormMode; configured:
   </AuthCard>;
 }
 
-// Old Supabase links cannot verify a Neon identity. Keep a useful landing page.
-export function ConfirmEmail() {
-  return <AuthCard title="Request a new email." description="Account emails sent before the migration have expired. Reconnect your original account, or request a new verification code or password reset link.">
-    <div className="auth-links"><Link href="/reconnect">Reconnect existing account</Link><Link href="/verify-email">Verify email</Link><Link href="/forgot-password">Reset password</Link></div>
-  </AuthCard>;
-}
-
 export function AccountAccess({userId}: {userId: string}) {
   const [error, setError] = useState(""); const [loading, setLoading] = useState(false);
   const logout = async () => {

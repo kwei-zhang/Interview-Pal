@@ -1,12 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
-export {adminId,memberId} from './auth-database';
-import {adminId,memberId} from './auth-database';
+import {applySchema} from '../../scripts/lib/schema';
+export const adminId = '11111111-1111-4111-8111-111111111111';
+export const memberId = '22222222-2222-4222-8222-222222222222';
 export async function setupNeon(db: PGlite) {
-  for (const file of ['001_application.sql','002_admissions.sql','003_legacy_metadata.sql','004_webhook_receipts.sql','005_provider_creation_binding.sql']) await db.exec(readFileSync(`neon/migrations/${file}`,'utf8'));
+  // PGlite's prepared-query API accepts one statement; schema files contain many.
+  await applySchema({query: async <T>(sql: string, params?: unknown[]) => {
+    if (params) return db.query<T>(sql, params);
+    return {rows: (await db.exec(sql)).flatMap(result => result.rows) as T[]};
+  }});
   await db.query(`insert into public.app_accounts(user_id,email,role,status,verified_at,legacy) values
     ($1,'admin@example.test','admin','active',now(),true),($2,'member@example.test','member','active',now(),true)`,[adminId,memberId]);
-  await db.exec(readFileSync('supabase/seed.sql','utf8'));
+  await db.exec(readFileSync('neon/seed.sql','utf8'));
 }
 export async function asNeonUser(db: PGlite,userId: string|null) {
   await db.exec('reset role');

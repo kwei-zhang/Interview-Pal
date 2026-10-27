@@ -9,16 +9,13 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   // Recovery URLs contain one-time credentials. Keep them out of dev logs.
-  logging: {incomingRequests: {ignore: [/\/auth\/confirm/, /\/reset-password/]}},
+  logging: {incomingRequests: {ignore: [/\/reset-password/]}},
   async headers() {
     return [{source: "/:path*", headers: [
       {key: "X-Content-Type-Options", value: "nosniff"},
       {key: "Referrer-Policy", value: "strict-origin-when-cross-origin"},
       {key: "Permissions-Policy", value: "camera=(), microphone=(self)"},
       {key: "X-Frame-Options", value: "DENY"},
-    ]}, {source: "/auth/confirm", headers: [
-      {key: "Referrer-Policy", value: "no-referrer"},
-      {key: "Cache-Control", value: "no-store"},
     ]}, {source: "/reset-password", headers: [
       {key: "Referrer-Policy", value: "no-referrer"},
       {key: "Cache-Control", value: "no-store"},

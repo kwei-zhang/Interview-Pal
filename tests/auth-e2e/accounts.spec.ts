@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { adminId, memberId } from "../helpers/auth-database";
+import { adminId, memberId } from "../helpers/neon-database";
 
 const mount = process.env.TEST_BASE_PATH || "";
 const appPath = (path: string) => path === "/" && mount ? mount : `${mount}${path}`;
@@ -100,8 +100,6 @@ test("Admin can replace and revoke codes; invalid and expired links have recover
   const pending = page.getByRole("row").filter({hasText: email}).filter({hasText: "Pending"});
   await pending.getByRole("button", {name: "Revoke", exact: true}).click();
   await expect(page.getByRole("row").filter({hasText: email}).filter({hasText: "Revoked"})).toHaveCount(2);
-  await page.goto(appPath("/auth/confirm?token_hash=expired-token&type=email"));
-  await expect(page.getByRole("link", {name: "Reconnect existing account"})).toBeVisible();
   await page.goto(appPath("/reset-password?token=expired-token"));
   await page.getByLabel("Password",{exact:true}).fill("Changed-password-2026");
   await page.getByLabel("Confirm password").fill("Changed-password-2026");
@@ -152,6 +150,7 @@ test("Navigation, Monaco assets, cookies, and agent requests stay in the app pat
   expect(cookies.every(cookie => cookie.path === (mount || "/"))).toBe(true);
   await page.getByRole("link", {name: "Coding practice"}).click();
   await expect(page.getByRole("link", {name: "Coding practice"})).toHaveClass(/active/);
+  await page.getByRole("textbox", {name: "Search coding problems"}).fill("Two Sum");
   await page.getByRole("link", {name: "Two Sum", exact: false}).first().click();
   await page.getByRole("button", {name: "Use Monaco editor"}).click();
   await expect(page.locator(".monaco-editor").first()).toBeVisible({timeout: 30000});
