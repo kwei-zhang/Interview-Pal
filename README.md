@@ -35,6 +35,8 @@ Use server-only `DATABASE_URL`, `NEON_AUTH_BASE_URL` and a cryptographically ran
 
 Maintain the active database schema with `SCHEMA_DATABASE_URL` and `npm run db:apply`. See [Neon database maintenance](neon/README.md) for schema updates, catalog seeding and runtime-role requirements. Schema credentials are never deployed with the application.
 
+Project prep (`/project-interview`) organizes resume material into named projects with individually editable bullet points. Apply `007_resume_bullets.sql` with `npm run db:apply` before deploying this version to a connected workspace. The page supports adding, editing and deleting projects, with multiple ordered bullet points per project; Mock interviews includes a Project interview mode that uses a snapshot of the selected project for OpenAI text or live voice follow-ups and a final review. Editing or deleting preparation material does not change an existing interview snapshot. Other projects and private scratchpad notes are not sent to the interviewer. Local previews keep these points in the existing browser workspace, and workspace exports include them.
+
 The Top Interview 150 update includes `006_top_interview_150.sql`; apply it with `npm run db:apply` before using new questions in a connected workspace. It adds the new catalog and preserves existing progress, drafts, sessions, and retired problem IDs. `npm run seed:generate` refreshes the fresh-install seed without rewriting applied migrations.
 
 In Neon Auth, enable email/password with **OTP email verification**, require verification, send a verification code on signup, and disable automatic sign-in after verification. Disable OAuth/anonymous/phone signups. Keep signup disabled until the signed `user.before_create` and `user.created` webhook at `/api/auth/neon-webhook` is reachable over HTTPS. Subscribe only to those two events so Neon retains its shared email delivery. Configure trusted website origins and test actual delivery/rate limits before production. See [Neon webhooks](https://neon.com/docs/auth/guides/webhooks).
@@ -79,6 +81,26 @@ The Neon migrations include persistent interview and execution quotas. The agent
 A provider failure leaves candidate turns and code saved. Retrying a failed typed turn avoids duplicating the candidate message. If feedback fails, the completed review explicitly says no assessment was generated. The interviewer receives public examples and verification outcomes, not preparation notes or the story bank. The judge receives the problem brief and unchanged candidate code and generates check cases at request time. Code context is capped at 12,000 characters and conversation context at 32,000; full drafts and transcripts remain in the workspace.
 
 Verify actual microphone permission behavior, audio playback, interruptions, reconnection, transcript order, and complete coding and behavioral voice sessions on your target browser before release. Deterministic tests use provider fixtures and do not incur API charges.
+
+## Interview recordings
+
+Coding, Behavioral and Project interviews support **Record interview** during live voice. Recording is opt-in and visibly indicated. The recorder mixes the existing microphone and remote interviewer audio without opening another microphone. Muting the microphone also silences it in the recording; muting interviewer playback does not remove the interviewer from the recording. Typed-chat speech synthesis is not captured.
+
+Completed recordings upload to a **private Neon Object Storage bucket**. The account-owned session and recording metadata stay in Postgres; audio is never included in workspace JSON exports or AI requests. Review pages provide playback, download and permanent deletion. Upload authorization and playback links are issued only after verifying the signed-in account and session ownership. Upload forms are restricted to an exact file size, audio MIME type and server-selected object key. Upload forms expire after five minutes; playback/download links expire after fifteen minutes and can be refreshed by pressing Play or Download again. Uploaded recordings have no automatic expiry in this app.
+
+While recording, audio chunks are checkpointed to an account-scoped browser database about every five seconds. Refreshing can recover these chunks as a partial recording; the last unsaved seconds can be lost when a tab or browser closes abruptly. Upload failures retain the local copy with **Upload to account** and **Download recording** actions. Keep the page open until upload finishes. Once uploaded, recordings remain accessible on other devices; before upload, the backup is only in that browser. Local demo mode supports recording and download but cannot upload without a signed-in cloud workspace. Each recording is limited to 128 MiB; interruptions or repeated recording create separate clips.
+
+Apply `008_interview_recordings.sql` using the normal migration workflow, and create a **private** `interview-recordings` bucket on the same Neon branch. Set these server-only environment variables for each deployment environment:
+
+```dotenv
+RECORDINGS_S3_ENDPOINT=https://YOUR-BRANCH.storage.YOUR-NEON-REGION.neon.tech
+RECORDINGS_S3_REGION=us-east-2
+RECORDINGS_S3_BUCKET=interview-recordings
+RECORDINGS_S3_ACCESS_KEY_ID=YOUR_SCOPED_TOKEN_ID
+RECORDINGS_S3_SECRET_ACCESS_KEY=YOUR_S3_SECRET
+```
+
+Use the endpoint reported by Neon and a branch-scoped credential with `storage:read` and `storage:write`. Never expose these variables with `NEXT_PUBLIC_`. `scripts/check-recording-storage.ts` verifies a browser upload, private download, anonymous-access rejection and cleanup using synthetic test data. `tests/auth-e2e/recordings.spec.ts` uses the same storage environment with isolated test accounts and a temporary local database to verify the full authenticated flow.
 
 ## Database and integration boundaries
 

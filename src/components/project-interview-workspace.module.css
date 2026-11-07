@@ -1,0 +1,30 @@
+.layout {display:grid;grid-template-columns:minmax(280px,.85fr) minmax(0,1.15fr);gap:24px;align-items:start}
+.editor {padding:25px}
+.editor h2,.listHeading h2 {font-size:17px}
+.intro {font-size:12px;color:var(--muted);margin:8px 0 24px;line-height:1.7}
+.form {display:grid;gap:20px}
+.form input,.form textarea {font-size:12px}
+.form textarea {line-height:1.8}
+.bulletFields {border:0;padding:0;margin:0;min-width:0}
+.bulletFields legend {font-size:12px;font-weight:600}
+.draftList {display:grid;gap:16px;margin:16px 0}
+.draftBullet {min-width:0}
+.rowHeading {display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:7px;min-height:26px}
+.rowHeading label {margin:0;color:var(--muted);font-size:11px}
+.rowHeading button {width:26px;height:26px}
+.form .draftBullet textarea {min-height:100px}
+.addBullet {width:100%;border-style:dashed;color:var(--purple)}
+.saved {min-width:0}
+.listHeading {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}
+.list {list-style:none;padding:0;margin:0;display:grid;gap:16px}
+.bullet {padding:23px;min-width:0}
+.bullet h3 {font-size:13px;color:var(--purple);margin-bottom:12px;overflow-wrap:anywhere}
+.text {font-size:13px;line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere}
+.projectBullets {margin:0;padding-left:19px;list-style:disc;display:grid;gap:10px}
+.projectBullets li::marker {color:var(--purple)}
+.footer {display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+.editing {border-color:var(--purple)}
+.confirmation {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px;padding:14px;background:var(--surface-soft);border-radius:8px;font-size:11px}
+.deleteButton {background:var(--red-bg);color:var(--red);border-color:var(--red)}
+@media(max-width:1000px){.layout{grid-template-columns:1fr}.editor{max-width:none}}
+@media(max-width:720px){.layout{gap:22px}.editor,.bullet{padding:19px}.listHeading h2{font-size:16px}}

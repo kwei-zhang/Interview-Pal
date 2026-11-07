@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, AudioLines, BookOpen, Check, Code2, History, LayoutDashboard, Menu, Moon, Settings2, Sun, X, CloudOff, RefreshCw, LockKeyhole } from "lucide-react";
+import { ArrowUpRight, AudioLines, BookOpen, Check, Code2, FileText, History, LayoutDashboard, Menu, Moon, Settings2, Sun, X, CloudOff, RefreshCw, LockKeyhole } from "lucide-react";
 import { useWorkspace } from "./workspace-provider";
 import { LoadingState } from "./ui";
 import { problems } from "@/lib/data/catalog";
@@ -12,6 +12,7 @@ const navigation = [
   {href: "/", label: "Overview", icon: LayoutDashboard},
   {href: "/coding", label: "Coding practice", icon: Code2},
   {href: "/behavioral", label: "Behavioral prep", icon: BookOpen},
+  {href: "/project-interview", label: "Project prep", icon: FileText},
   {href: "/interviews", label: "Mock interviews", icon: AudioLines},
   {href: "/history", label: "Session history", icon: History},
 ];

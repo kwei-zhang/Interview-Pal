@@ -28,6 +28,8 @@ function mutationKey(m: WorkspaceMutation): string {
   if (m.kind === "progress") return `progress:${m.value.problemId}`;
   if (m.kind === "draft") return `draft:${m.value.problemId}:${m.value.language}`;
   if (m.kind === "story") return `story:${m.value.id}`;
+  if (m.kind === "resume-bullet") return `resume-bullet:${m.value.id}`;
+  if (m.kind === "delete-resume-bullet") return `resume-bullet:${m.id}`;
   if (m.kind === "session") return `session:${m.value.id}`;
   return `${m.kind === "delete-story" ? "story" : "session"}:${m.id}`;
 }
@@ -86,12 +88,15 @@ export function WorkspaceProvider({mode, userId, children}: {mode: "demo" | "clo
         const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
         loaded = raw ? JSON.parse(raw) : emptyWorkspace();
         if (!loaded.profile || !loaded.progress || !loaded.drafts || !Array.isArray(loaded.stories) || !Array.isArray(loaded.sessions) || !Array.isArray(loaded.attempts)) throw new Error("Your saved local workspace could not be read. Restore a backup or clear this site's storage to start again.");
+        // Workspaces saved before project interviews do not have resume material yet.
+        if (loaded.resumeBullets === undefined) loaded.resumeBullets = [];
       } else {
         const response = await accountFetch("/api/workspace");
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Could not load your workspace.");
         loaded = body;
       }
+      if (!Array.isArray(loaded.resumeBullets)) throw new Error("Your saved resume bullet points could not be read.");
       if (!active.current) return;
       dataRef.current = loaded; setData(loaded); setReady(true); setError(""); setSyncState("saved");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not load the workspace."); setSyncState("error"); }

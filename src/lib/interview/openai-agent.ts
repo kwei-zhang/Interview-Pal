@@ -1,6 +1,7 @@
 import { appFetch } from "../paths";
 import { problemById } from "../data/catalog";
 import { questionById } from "../data/behavioral";
+import { projectOpening } from "./modules";
 import type { Attempt, InterviewSession, TranscriptEvent } from "../types";
 import { feedbackSchema } from "../validation";
 import type { CandidateInput, InterviewAgentAdapter, InterviewAgentEvent } from "./agent";
@@ -47,7 +48,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
   }
   private openTextChat() {
     const session = this.session;
-    if (session && !session.transcript.length && !this.disposed && !this.ending) this.say("interviewer", session.type === "coding" ? `Let's work on ${problemById(session.questionId)?.title}.` : questionById(session.questionId)!.question);
+    if (session && !session.transcript.length && !this.disposed && !this.ending) this.say("interviewer", session.type === "coding" ? `Let's work on ${problemById(session.questionId)?.title}.` : session.type === "project" ? projectOpening(session.project) : questionById(session.questionId)!.question);
   }
   connectVoice(onState: (listening: boolean) => void, onError: (message: string) => void) {
     if (this.disposed || this.ending || !this.session) return;
@@ -127,7 +128,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
       const result = await this.request("feedback", AbortSignal.any([abort.signal, AbortSignal.timeout(160000)]));
       if (!this.disposed) this.emit({type: "feedback", feedback: feedbackSchema.parse(result.feedback)});
     } catch {
-      this.emit({type: "feedback", feedback: {source: "agent", summary: "AI feedback was unavailable. Your transcript and saved work are preserved; no assessment was generated.", strengths: [], improvements: [], evidence: [], dimensions: [], nextActions: ["Review your saved conversation and code.", "Retry a practice session when the AI connection is available."]}});
+      this.emit({type: "feedback", feedback: {source: "agent", summary: "AI feedback was unavailable. Your transcript and saved work are preserved; no assessment was generated.", strengths: [], improvements: [], evidence: [], dimensions: [], nextActions: [this.session?.type === "project" ? "Review your saved conversation and project details." : "Review your saved conversation and code.", "Retry a practice session when the AI connection is available."]}});
     }
     this.emit({type: "interviewer-state", state: "disconnected"});
   }

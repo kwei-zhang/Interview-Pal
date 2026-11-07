@@ -1,0 +1,8 @@
+.types {grid-template-columns:repeat(3,minmax(0,1fr))}
+.projectPreview {margin-top:14px;padding:16px;background:var(--surface-soft);border:1px solid var(--border);border-radius:9px}
+.projectPreview h3 {font-size:12px;margin-bottom:10px}
+.projectPreview ul {list-style:disc;padding-left:18px;margin:0;display:grid;gap:8px;max-height:230px;overflow:auto;font-size:11px;line-height:1.8}
+.projectEmpty {padding:20px;background:var(--surface-soft);border-radius:9px}
+.projectEmpty h3 {font-size:14px;margin-bottom:8px}
+.projectEmpty p {font-size:12px;color:var(--muted);margin-bottom:14px}
+@media(max-width:1100px){.types{grid-template-columns:1fr}}

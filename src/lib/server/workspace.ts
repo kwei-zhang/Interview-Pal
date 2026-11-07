@@ -1,7 +1,7 @@
 import type { Database } from "./database";
 import { databaseFunction } from "./database";
 import { emptyWorkspace, draftKey, type WorkspaceData, type WorkspaceMutation, type InterviewSession, type Story,
-  type Profile, type ProblemProgress, type CodeDraft, type TranscriptEvent, type Feedback, type Attempt } from "../types";
+  type Profile, type ProblemProgress, type CodeDraft, type TranscriptEvent, type Feedback, type Attempt, type ResumeBullet } from "../types";
 
 export async function loadWorkspace(db: Database, userId: string): Promise<WorkspaceData> {
   // One network round trip and one PostgreSQL snapshot for the entire workspace.
@@ -9,6 +9,7 @@ export async function loadWorkspace(db: Database, userId: string): Promise<Works
   const {rows: [data]} = await db.query<{
     profiles: {data: Profile}[]; progress: {data: ProblemProgress}[]; drafts: {data: CodeDraft}[];
     stories: {id: string; data: Story}[]; links: {story_id: string; question_id: string}[];
+    resume_bullets: {data: ResumeBullet}[];
     sessions: {id: string; data: InterviewSession}[]; events: {session_id: string; data: TranscriptEvent}[];
     feedback: {session_id: string; data: Feedback}[]; attempts: {data: Attempt & {testCases?: unknown}; session_id: string | null}[];
   }>(`select
@@ -16,6 +17,7 @@ export async function loadWorkspace(db: Database, userId: string): Promise<Works
     coalesce((select jsonb_agg(t) from (select data from public.problem_progress where user_id=$1 order by problem_id) t),'[]') as progress,
     coalesce((select jsonb_agg(t) from (select data from public.code_drafts where user_id=$1 order by problem_id,language) t),'[]') as drafts,
     coalesce((select jsonb_agg(t) from (select id,data from public.stories where user_id=$1 order by updated_at desc,id) t),'[]') as stories,
+    coalesce((select jsonb_agg(t) from (select data from public.resume_bullets where user_id=$1 order by updated_at desc,id) t),'[]') as resume_bullets,
     coalesce((select jsonb_agg(t) from (select story_id,question_id from public.story_question_links where user_id=$1 order by story_id,question_id) t),'[]') as links,
     coalesce((select jsonb_agg(t) from (select id,data from public.interview_sessions where user_id=$1 order by updated_at desc,id) t),'[]') as sessions,
     coalesce((select jsonb_agg(t) from (select session_id,data from public.interview_events where user_id=$1 order by session_id,position,id) t),'[]') as events,
@@ -26,6 +28,7 @@ export async function loadWorkspace(db: Database, userId: string): Promise<Works
     progress: Object.fromEntries(data.progress.map(row => [row.data.problemId, row.data])),
     drafts: Object.fromEntries(data.drafts.map(row => [draftKey(row.data.problemId, row.data.language), row.data])),
     stories: data.stories.map(row => ({...row.data, questionIds: data.links.filter(link => link.story_id === row.id).map(link => link.question_id)})),
+    resumeBullets: data.resume_bullets.map(row => row.data),
     sessions: data.sessions.map(row => ({...row.data, transcript: data.events.filter(event => event.session_id === row.id).map(event => event.data), feedback: data.feedback.find(f => f.session_id === row.id)?.data})),
     attempts: data.attempts.map(row => {const {testCases: _testCases, ...attempt} = row.data; return {...attempt, sessionId: row.session_id || undefined};}),
   };
@@ -43,6 +46,9 @@ export async function saveMutation(db: Database, userId: string, mutation: Works
       await databaseFunction(db, "public.save_story", [story.id, story, questionIds, story.updatedAt]); return;
     }
     case "delete-story": await db.query("delete from public.stories where user_id=$1 and id=$2", [userId, mutation.id]); return;
+    case "resume-bullet":
+      await db.query("insert into public.resume_bullets(id,user_id,data,updated_at) values($1,$2,$3,$4) on conflict(id) do update set data=excluded.data,updated_at=excluded.updated_at where public.resume_bullets.updated_at<=excluded.updated_at", [mutation.value.id, userId, mutation.value, mutation.value.updatedAt]); return;
+    case "delete-resume-bullet": await db.query("delete from public.resume_bullets where user_id=$1 and id=$2", [userId, mutation.id]); return;
     case "session": {
       const {transcript, feedback, ...session} = mutation.value;
       await databaseFunction(db, "public.save_interview_session", [session.id, session, JSON.stringify(transcript), feedback || null, session.lastActiveAt]); return;

@@ -11,6 +11,7 @@ test("Catalog migration and reseeding preserve saved work and allow drafts for a
   const owner = "11111111-1111-4111-8111-111111111111";
   try {
     await db.exec(readFileSync("neon/migrations/001_application.sql", "utf8"));
+    await db.exec(readFileSync("neon/migrations/007_resume_bullets.sql", "utf8"));
     await db.exec("insert into public.role_tracks(id,name) values ('software-engineer','Software engineer'); insert into public.question_collections(id,role_id,name) values ('neetcode-150','software-engineer','NeetCode 150')");
     for (const p of previousCatalog) await db.query("insert into public.problems(id,collection_id,data) values ($1,'neetcode-150',$2)", [p.id, {...p, collectionId: "neetcode-150"}]);
     await db.query("insert into public.app_accounts(user_id,email,verified_at) values ($1,'catalog@example.test',now())", [owner]);

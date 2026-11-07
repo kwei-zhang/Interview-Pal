@@ -1,3 +1,4 @@
+import type { RecordingStreams } from "../recordings/capture";
 import type { InterviewAgentEvent, VoiceTransport } from "./agent";
 import { BrowserVoiceTransport } from "./browser-voice";
 import { RealtimeEvents } from "./realtime-events";
@@ -7,6 +8,10 @@ export class RealtimeVoiceTransport implements VoiceTransport {
   private channel?: RTCDataChannel;
   private stream?: MediaStream;
   private audio?: HTMLAudioElement;
+  private remoteStream?: MediaStream;
+  private audioListeners = new Set<(streams: RecordingStreams) => void>();
+  subscribeAudioStreams(listener: (streams: RecordingStreams) => void) {this.audioListeners.add(listener); listener({microphone: this.stream, interviewer: this.remoteStream}); return () => {this.audioListeners.delete(listener);};}
+  private publishAudioStreams() {const streams = {microphone: this.stream, interviewer: this.remoteStream}; this.audioListeners.forEach(listener => listener(streams));}
   private abort?: AbortController;
   private browser = new BrowserVoiceTransport();
   private events: RealtimeEvents;
@@ -40,10 +45,10 @@ export class RealtimeVoiceTransport implements VoiceTransport {
     const abort = new AbortController(); this.abort = abort;
     const stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}, video: false});
     if (this.disposed || abort.signal.aborted) {stream.getTracks().forEach(track => track.stop()); return;}
-    this.stream = stream;
+    this.stream = stream; this.publishAudioStreams();
     const peer = new RTCPeerConnection(); this.peer = peer;
     const audio = new Audio(); audio.autoplay = true; audio.muted = this.muted; this.audio = audio;
-    peer.ontrack = event => {audio.srcObject = event.streams[0]; void audio.play().catch(() => this.emit({type: "error", message: "Audio playback was blocked. Enable interviewer audio to play it."}));};
+    peer.ontrack = event => {this.remoteStream = event.streams[0] || new MediaStream([event.track]); audio.srcObject = this.remoteStream; this.publishAudioStreams(); void audio.play().catch(() => this.emit({type: "error", message: "Audio playback was blocked. Enable interviewer audio to play it."}));};
     stream.getAudioTracks().forEach(track => peer.addTrack(track, stream));
     const channel = peer.createDataChannel("oai-events"); this.channel = channel;
     this.events = new RealtimeEvents(this.emit);
@@ -126,7 +131,7 @@ export class RealtimeVoiceTransport implements VoiceTransport {
     this.abort?.abort(); this.abort = undefined;
     const peer = this.peer; this.peer = undefined;
     this.channel?.close(); this.channel = undefined; peer?.close();
-    this.stream?.getTracks().forEach(track => track.stop()); this.stream = undefined;
+    this.stream?.getTracks().forEach(track => track.stop()); this.stream = undefined; this.remoteStream = undefined; this.publishAudioStreams();
     if (this.audio) {this.audio.pause(); this.audio.srcObject = null; this.audio = undefined;}
     this.contextItem = undefined; this.contextText = ""; this.responding = false; this.pendingToolResponse = false; this.handledCalls.clear();
     this.events.finish(); this.onState?.(false);

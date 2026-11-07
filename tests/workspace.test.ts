@@ -8,7 +8,7 @@ test('Cloud history loads all paginated transcripts and strips internal executio
   const sessions = ['session-a', 'session-b', 'session-c'];
   const events = sessions.flatMap(session_id => Array.from({length: 400}, (_, position) => ({session_id, data: {id: `${session_id}-${position}`, role: 'candidate', text: `response ${position}`, timestamp: '2026-10-10T12:00:00Z'}})));
   const tables: Record<string, unknown[]> = {
-    profiles: [], progress: [], drafts: [], stories: [], links: [],
+    profiles: [], progress: [], drafts: [], stories: [], links: [], resume_bullets: [],
     sessions: sessions.map(id => ({id, data: {id, status: 'completed'}})),
     events, feedback: [],
     attempts: [{data: {id: 'attempt', code: 'saved code', testCases: [{expected: 'internal'}], sessionId: 'deleted-session'}, session_id: null}],

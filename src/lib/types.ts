@@ -2,7 +2,7 @@ export const languages = ["python", "javascript", "typescript"] as const;
 export type Language = typeof languages[number];
 export type Difficulty = "Easy" | "Medium" | "Hard";
 export type ProgressStatus = "not-started" | "practicing" | "solved";
-export type InterviewType = "coding" | "behavioral";
+export type InterviewType = "coding" | "behavioral" | "project";
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 export interface Problem {
@@ -57,9 +57,11 @@ export interface InterviewSession {
   status: "active" | "completed" | "interrupted";
   startedAt: string; endedAt?: string; lastActiveAt: string; elapsedSeconds: number;
   scratchpad: string; transcript: TranscriptEvent[]; feedback?: Feedback;
+  project?: ProjectInterviewSnapshot;
   // "mock" is retained only to read historical sessions; all new/resumed sessions use "agent".
   adapter: "mock" | "agent";
 }
+export interface ProjectInterviewSnapshot {id: string; name: string; bullets: string[]}
 interface TestResult {name: string; input?: string; passed: boolean; actual?: Json; expected?: Json; error?: string}
 export interface ExecutionResult {
   status: "queued" | "running" | "passed" | "failed" | "reviewed" | "error" | "timeout";
@@ -73,11 +75,13 @@ export interface Attempt {
   createdAt: string; provider?: "openai-code-interpreter" | "openai-judge"; providerJobId?: string; result: ExecutionResult;
 }
 export interface Profile {displayName: string; targetRole: string; weeklyGoal: number}
+export interface ResumeBullet {id: string; project: string; projectId?: string; position?: number; text: string; updatedAt: string}
 export interface WorkspaceData {
   profile: Profile;
   progress: Record<string, ProblemProgress>;
   drafts: Record<string, CodeDraft>;
   stories: Story[];
+  resumeBullets: ResumeBullet[];
   sessions: InterviewSession[];
   attempts: Attempt[];
 }
@@ -87,11 +91,13 @@ export type WorkspaceMutation =
   | {kind: "draft"; value: CodeDraft}
   | {kind: "story"; value: Story}
   | {kind: "delete-story"; id: string}
+  | {kind: "resume-bullet"; value: ResumeBullet}
+  | {kind: "delete-resume-bullet"; id: string}
   | {kind: "session"; value: InterviewSession}
   | {kind: "delete-session"; id: string};
 
 export function emptyWorkspace(): WorkspaceData {
-  return {profile: {displayName: "", targetRole: "Software engineer", weeklyGoal: 5}, progress: {}, drafts: {}, stories: [], sessions: [], attempts: []};
+  return {profile: {displayName: "", targetRole: "Software engineer", weeklyGoal: 5}, progress: {}, drafts: {}, stories: [], resumeBullets: [], sessions: [], attempts: []};
 }
 export const draftKey = (problemId: string, language: Language) => `${problemId}:${language}`;
 export function applyMutation(data: WorkspaceData, mutation: WorkspaceMutation): WorkspaceData {
@@ -101,6 +107,8 @@ export function applyMutation(data: WorkspaceData, mutation: WorkspaceMutation):
     case "draft": return {...data, drafts: {...data.drafts, [draftKey(mutation.value.problemId, mutation.value.language)]: mutation.value}};
     case "story": return {...data, stories: [mutation.value, ...data.stories.filter(s => s.id !== mutation.value.id)]};
     case "delete-story": return {...data, stories: data.stories.filter(s => s.id !== mutation.id)};
+    case "resume-bullet": return {...data, resumeBullets: [mutation.value, ...data.resumeBullets.filter(b => b.id !== mutation.value.id)]};
+    case "delete-resume-bullet": return {...data, resumeBullets: data.resumeBullets.filter(b => b.id !== mutation.id)};
     case "session": return {...data, sessions: [mutation.value, ...data.sessions.filter(s => s.id !== mutation.value.id)]};
     case "delete-session": return {...data, sessions: data.sessions.filter(s => s.id !== mutation.id), attempts: data.attempts.map(a => a.sessionId === mutation.id ? {...a, sessionId: undefined} : a)};
   }

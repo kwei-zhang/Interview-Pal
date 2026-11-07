@@ -1,3 +1,4 @@
+import type { RecordingStreams } from "../recordings/capture";
 import type { Attempt, ExecutionResult, Feedback, InterviewSession, Language, TranscriptEvent } from "../types";
 
 export type InterviewAgentEvent =
@@ -11,6 +12,7 @@ export type InterviewAgentEvent =
 export interface CandidateInput {text: string; code?: string; language?: Language; testResults?: ExecutionResult; testedCode?: string; testedLanguage?: Language}
 export interface VoiceTransport {
   available: boolean;
+  subscribeAudioStreams?(listener: (streams: RecordingStreams) => void): () => void;
   checkMicrophone(): Promise<void>;
   startListening(onText: (text: string) => void, onState: (listening: boolean) => void, onError: (message: string) => void): void;
   stopListening(): void;

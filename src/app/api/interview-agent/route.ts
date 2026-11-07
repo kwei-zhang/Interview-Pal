@@ -1,5 +1,6 @@
 import { databaseFunction } from "@/lib/server/database";
 import type { InterviewSession } from "@/lib/types";
+import { projectInterviewSchema } from "@/lib/validation";
 import { headers } from "next/headers";
 import { assertSameOrigin, errorResponse, HttpError, readJson } from "@/lib/server/http";
 import { assertAccountBinding, requireUser, neonConfigured } from "@/lib/server/accounts";
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
       if (!record) throw new HttpError(404, "Interview session not found.");
       const session = record.data;
       if (session.status === "completed" || session.questionId !== input.session.questionId || session.type !== input.session.type || session.adapter !== "agent") throw new HttpError(409, "Save an active AI session before connecting the interviewer.");
+      // Use the saved project snapshot, not replacement material supplied with a turn.
+      if (session.type === "project") input.session.project = projectInterviewSchema.parse(session.project);
       const allowed = await auth.db(db => databaseFunction<boolean>(db, "public.claim_agent_slot"));
       if (!allowed) throw new HttpError(429, "Interview request limit reached. Please wait a minute before retrying.");
     } else {

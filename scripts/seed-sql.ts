@@ -4,7 +4,7 @@ import { definitions } from "../src/lib/problems/definitions";
 import { behavioralQuestions } from "../src/lib/data/behavioral";
 const sql = (v: unknown) => `'${(typeof v === "string" ? v : JSON.stringify(v)).replaceAll("'", "''")}'`;
 const catalogStatements = [
-  `insert into public.role_tracks(id,name,modules) values ('software-engineer','Software engineer','["coding","behavioral"]') on conflict (id) do update set name=excluded.name,modules=excluded.modules;`,
+  `insert into public.role_tracks(id,name,modules) values ('software-engineer','Software engineer','["coding","behavioral","project"]') on conflict (id) do update set name=excluded.name,modules=excluded.modules;`,
   `insert into public.question_collections(id,role_id,name,source_url) values ('neetcode-150','software-engineer','NeetCode 150','https://neetcode.io/practice/practice/neetcode150') on conflict (id) do update set name=excluded.name,source_url=excluded.source_url;`,
   `insert into public.question_collections(id,role_id,name,source_url) values (${sql(codingCollection.id)},'software-engineer',${sql(codingCollection.name)},${sql(codingCollection.sourceUrl)}) on conflict (id) do update set name=excluded.name,source_url=excluded.source_url;`,
   ...[...problems, ...archivedProblems].map(p => `insert into public.problems(id,collection_id,data) values (${sql(p.id)},${sql(p.collectionId)},${sql(p)}::jsonb) on conflict (id) do update set collection_id=excluded.collection_id,data=excluded.data;`),
