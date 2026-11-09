@@ -10,6 +10,18 @@ test.beforeEach(async({page})=>{
   await page.addInitScript(serialized=>{
     if(!localStorage.getItem("interview-pal.workspace.v1"))localStorage.setItem("interview-pal.workspace.v1",serialized);
     localStorage.setItem("interview-pal.plain-editor","true");
+    const NativeRecorder=MediaRecorder;
+    const recordingTest={recorders:[] as MediaRecorder[],rollover:false};
+    class ObservedRecorder extends NativeRecorder {
+      constructor(stream:MediaStream,options?:MediaRecorderOptions){
+        super(stream,options);recordingTest.recorders.push(this);
+        this.addEventListener("dataavailable",event=>{
+          // Exercise the real recorder's size-limit transition without a huge fixture.
+          if(recordingTest.rollover&&event.data.size){recordingTest.rollover=false;Object.defineProperty(event.data,"size",{value:128*1024*1024});}
+        });
+      }
+    }
+    Object.assign(window,{MediaRecorder:ObservedRecorder,recordingTest});
     HTMLMediaElement.prototype.play=async()=>{};
     let localStream:MediaStream;
     const audio=new AudioContext();
@@ -23,6 +35,7 @@ test.beforeEach(async({page})=>{
     }
     class Peer {
       channel=new Channel();ontrack?:(event:{streams:MediaStream[]})=>void;
+      constructor(){Object.assign(window,{disconnectRecordingVoice:()=>this.channel.close()});}
       addTrack(){}createDataChannel(){return this.channel;}
       async createOffer(){return {sdp:"v=0\r\no=test-offer"};}async setLocalDescription(){}
       async setRemoteDescription(){this.ontrack?.({streams:[remote]});this.channel.readyState="open";this.channel.onopen?.();}
@@ -33,12 +46,11 @@ test.beforeEach(async({page})=>{
 });
 
 for(const type of ["coding","behavioral","project"]){
-  test(`${type} records both sides, saves on finish, downloads and deletes`,async({page})=>{
+  test(`${type} automatically records both sides without an off switch, saves on finish, downloads and deletes`,async({page})=>{
     const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
     await page.goto(mountedPath(`/interviews?type=${type}&timed=false`));
     await page.getByRole("button",{name:"Enter practice room"}).click();
-    await expect(page.getByRole("button",{name:"Record interview",exact:true})).toBeEnabled();
-    await page.getByRole("button",{name:"Record interview",exact:true}).click();
+    await expect(page.getByRole("button",{name:/^(Record interview|Stop recording)$/})).toHaveCount(0);
     await expect(page.getByText("Recording your microphone and interviewer audio",{exact:true})).toBeVisible();
     // Allow a real MediaRecorder to produce audio from two synthetic sources.
     await page.waitForTimeout(1200);
@@ -65,31 +77,92 @@ for(const type of ["coding","behavioral","project"]){
   });
 }
 
-test("Refreshing during recording recovers saved chunks without recording again automatically",async({page})=>{
+test("Refreshing during recording recovers saved chunks and automatically records the resumed session",async({page})=>{
   await page.goto(mountedPath("/interviews?type=behavioral&timed=false"));
   await page.getByRole("button",{name:"Enter practice room"}).click();
-  await page.getByRole("button",{name:"Record interview",exact:true}).click();
+  await expect(page.getByText("Recording your microphone and interviewer audio",{exact:true})).toBeVisible();
   await expect.poll(()=>page.evaluate(async()=>{
     return await new Promise<number>(resolve=>{const request=indexedDB.open("interview-pal-recordings",1);request.onsuccess=()=>{const db=request.result;const all=db.transaction("chunks").objectStore("chunks").count();all.onsuccess=()=>{resolve(all.result);db.close();};};});
   }),{timeout:10000}).toBeGreaterThan(0);
   await page.reload();
   await expect(page.getByRole("button",{name:"Download recording",exact:true})).toBeVisible();
-  await expect(page.getByRole("button",{name:"Record interview",exact:true})).toBeEnabled();
-  await expect(page.getByText("Recording your microphone and interviewer audio",{exact:true})).toHaveCount(0);
+  await expect(page.getByText("Recording your microphone and interviewer audio",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:/^(Record interview|Stop recording)$/})).toHaveCount(0);
+  const download=page.waitForEvent("download");
+  await page.getByRole("button",{name:"Download recording",exact:true}).click();await download;
+  await expect(page.getByText("Recording your microphone and interviewer audio",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Stop microphone",exact:true})).toBeVisible();
   await page.screenshot({path:"/private/tmp/interview-pal-recording-recovered.png",fullPage:true});
 });
 
 test("Browser storage failure keeps a downloadable in-memory copy and reports that it is not saved",async({page})=>{
   await page.goto(mountedPath("/interviews?type=behavioral&timed=false"));
   await page.getByRole("button",{name:"Enter practice room"}).click();
-  await page.getByRole("button",{name:"Record interview",exact:true}).click();
+  await expect(page.getByText("Recording your microphone and interviewer audio",{exact:true})).toBeVisible();
   await page.evaluate(()=>{
     const original=IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put=function(value,key){if(this.name==="chunks")throw new DOMException("Test quota failure","QuotaExceededError");return original.call(this,value,key);};
   });
   await page.waitForTimeout(800);
-  await page.getByRole("button",{name:"Stop recording",exact:true}).click();
+  await page.getByRole("button",{name:"Finish session",exact:true}).click();
+  await expect(page).toHaveURL(/\/history\/[a-f0-9-]+$/);
   await expect(page.getByText(/Not saved — download before leaving/)).toBeVisible();
   const downloading=page.waitForEvent("download");await page.getByRole("button",{name:"Download recording",exact:true}).click();
   expect((await downloading).suggestedFilename()).toMatch(/\.webm$/);
+});
+
+test("Voice disconnect saves a clip and reconnect automatically records a new clip",async({page})=>{
+  await page.goto(mountedPath("/interviews?type=behavioral&timed=false"));
+  await page.getByRole("button",{name:"Enter practice room"}).click();
+  const indicator=page.getByText("Recording your microphone and interviewer audio",{exact:true});
+  await expect(indicator).toBeVisible();
+  await page.waitForTimeout(800);
+  await page.evaluate(()=>(window as unknown as {disconnectRecordingVoice:()=>void}).disconnectRecordingVoice());
+  await expect(indicator).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Download recording",exact:true})).toHaveCount(1);
+  await page.getByRole("button",{name:"Start microphone",exact:true}).click();
+  await expect(indicator).toBeVisible();
+  await page.waitForTimeout(800);
+  await page.getByRole("button",{name:"Finish session",exact:true}).click();
+  await expect(page).toHaveURL(/\/history\/[a-f0-9-]+$/);
+  await expect(page.getByRole("button",{name:"Download recording",exact:true})).toHaveCount(2);
+  await expect(indicator).toHaveCount(0);
+});
+
+test("Denied microphone access does not start recording or claim that audio is being saved",async({page})=>{
+  await page.goto(mountedPath("/interviews?type=behavioral&timed=false"));
+  await page.evaluate(()=>{Object.defineProperty(navigator.mediaDevices,"getUserMedia",{configurable:true,value:async()=>{throw new DOMException("Permission denied","NotAllowedError");}});});
+  await page.getByRole("button",{name:"Enter practice room"}).click();
+  await expect(page.getByRole("alert").filter({hasText:"Permission denied"})).toBeVisible();
+  await expect(page.getByText("Recording your microphone and interviewer audio",{exact:true})).toHaveCount(0);
+  await page.getByRole("button",{name:"Finish session",exact:true}).click();
+  await expect(page.getByText("No recordings saved for this session.")).toBeVisible();
+});
+
+test("Recording size limit saves the clip and automatically continues in another",async({page})=>{
+  await page.goto(mountedPath("/interviews?type=behavioral&timed=false"));
+  await page.getByRole("button",{name:"Enter practice room"}).click();
+  const indicator=page.getByText("Recording your microphone and interviewer audio",{exact:true});
+  await expect(indicator).toBeVisible();await page.waitForTimeout(800);
+  await page.evaluate(()=>{
+    const state=(window as unknown as {recordingTest:{recorders:MediaRecorder[];rollover:boolean}}).recordingTest;
+    state.rollover=true;state.recorders[0].requestData();
+  });
+  await expect(page.getByRole("button",{name:"Download recording",exact:true})).toHaveCount(1);
+  await expect(indicator).toBeVisible();await page.waitForTimeout(800);
+  await page.getByRole("button",{name:"Finish session",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Download recording",exact:true})).toHaveCount(2);
+});
+
+test("Recorder failure is visible and can retry without exposing a recording off switch",async({page})=>{
+  await page.goto(mountedPath("/interviews?type=behavioral&timed=false"));
+  await page.getByRole("button",{name:"Enter practice room"}).click();
+  const indicator=page.getByText("Recording your microphone and interviewer audio",{exact:true});
+  await expect(indicator).toBeVisible();await page.waitForTimeout(800);
+  await page.evaluate(()=>(window as unknown as {recordingTest:{recorders:MediaRecorder[]}}).recordingTest.recorders[0].dispatchEvent(new Event("error")));
+  await expect(indicator).toHaveCount(0);
+  await expect(page.getByText("Recording stopped unexpectedly. Any captured audio is kept.",{exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Retry automatic recording",exact:true}).click();
+  await expect(indicator).toBeVisible();
+  await expect(page.getByRole("button",{name:/^(Record interview|Stop recording)$/})).toHaveCount(0);
 });

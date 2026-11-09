@@ -10,13 +10,17 @@ test.beforeEach(async ({page}) => {
   await page.addInitScript(() => {
     localStorage.setItem("interview-pal.plain-editor", "true");
     const track = {enabled: true, stopped: false, stop() {this.stopped = true;}};
-    const stream = {getAudioTracks: () => [track], getTracks: () => [track]};
+    const audio = new AudioContext();
     const state = {track, captures: 0, responses: 0, closed: 0, delayPermission: false, releasePermission: () => {}, toolOutputs: [] as unknown[], inject: (_message: unknown) => {}};
     Object.assign(window, {voiceTest: state});
     Object.defineProperty(navigator.mediaDevices, "getUserMedia", {configurable: true, value: async () => {
       state.captures++;
       if (state.delayPermission) await new Promise<void>(resolve => {state.releasePermission = resolve;});
-      track.stopped = false; track.enabled = true;
+      const stream = audio.createMediaStreamDestination().stream;
+      const current = Object.assign(stream.getAudioTracks()[0], {stopped: false});
+      const stop = current.stop.bind(current);
+      current.stop = () => {current.stopped = true; stop();};
+      state.track = current;
       return stream;
     }});
     class Channel {

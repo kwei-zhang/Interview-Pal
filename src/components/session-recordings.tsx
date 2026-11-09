@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { Circle, Download, Play, Square, Trash2, Upload } from "lucide-react";
+import { Download, Play, Trash2, Upload } from "lucide-react";
 import type { VoiceTransport } from "@/lib/interview/agent";
 import { InterviewAudioCapture, activeRecordingIds, type RecordingStreams } from "@/lib/recordings/capture";
 import { deleteLocalRecording, listLocalRecordings, type LocalRecording } from "@/lib/recordings/local";
@@ -25,12 +25,13 @@ export function SessionRecordings({sessionId,voice,live=false,ref}: {sessionId:s
   const [recording,setRecording]=useState(false);
   const [starting,setStarting]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [retryable,setRetryable]=useState(false);
   const [busy,setBusy]=useState("");
   const [deleting,setDeleting]=useState("");
   const [configured,setConfigured]=useState<boolean|null>(null);
   const [playback,setPlayback]=useState<{id:string;url:string}|null>(null);
-  const capture=useRef<InterviewAudioCapture|null>(null);
-  const streams=useRef<RecordingStreams>({});
+  const stopCapture=useRef<()=>Promise<void>>(async()=>{});
+  const retryCapture=useRef<()=>void>(()=>{});
   const mounted=useRef(true);
   const load=useCallback(async()=>{
     try {
@@ -50,40 +51,69 @@ export function SessionRecordings({sessionId,voice,live=false,ref}: {sessionId:s
     finally{if(mounted.current)setBusy("");}
   },[accountFetch,load]);
   const uploadRef=useRef(upload);uploadRef.current=upload;
-  const stop=useCallback(async()=>{
-    const current=capture.current;
-    if(!current)return;
-    if(mounted.current)setSaving(true);
-    await current.stop();
-    if(capture.current===current)capture.current=null;
-    if(mounted.current){setRecording(false);setSaving(false);}
-  },[]);
-  useImperativeHandle(ref,()=>({stop}),[stop]);
+  useImperativeHandle(ref,()=>({stop:()=>stopCapture.current()}),[]);
   useEffect(()=>{
     mounted.current=true;void load();
     const changed=()=>{void load();};window.addEventListener("interview-pal-recordings-changed",changed);
-    return()=>{mounted.current=false;window.removeEventListener("interview-pal-recordings-changed",changed);void capture.current?.stop();};
+    return()=>{mounted.current=false;window.removeEventListener("interview-pal-recordings-changed",changed);};
   },[load]);
-  useEffect(()=>voice?.subscribeAudioStreams?.(next=>{
-    streams.current=next;
-    if(!next.microphone){void stop();return;}
-    capture.current?.update(next);
-  }),[voice,stop]);
-  const start=async()=>{
-    if(starting || capture.current || !live || !streams.current.microphone)return;
-    setStarting(true);setError("");
-    try {
-      const current=new InterviewAudioCapture(owner,sessionId,message=>{if(mounted.current)setError(message);},value=>{
-        if(capture.current?.id===value.id)capture.current=null;
-        if(mounted.current){setRecording(false);setSaving(false);setLocal(previous=>[...previous.filter(row=>row.id!==value.id),value]);}
-        if(mode==="cloud" && value.blob.size)void uploadRef.current(value);
-      });
-      capture.current=current;
-      await current.start(streams.current);
-      if(mounted.current)setRecording(true);
-    } catch(error){await capture.current?.stop();capture.current=null;setError(error instanceof Error?error.message:"Recording could not start.");}
-    finally{if(mounted.current)setStarting(false);}
-  };
+  useEffect(()=>{
+    let active=true,finished=false,failed=false;
+    let streams:RecordingStreams={};
+    let current:InterviewAudioCapture|null=null;
+    const stopping=new Set<string>();
+    const stop=async()=>{
+      const previous=current;
+      if(!previous)return;
+      stopping.add(previous.id);
+      if(active)setSaving(true);
+      await previous.stop();
+      if(current===previous)current=null;
+      if(active&&!current){setRecording(false);setStarting(false);setSaving(false);}
+    };
+    const start=async()=>{
+      if(!active||finished||failed||current||!streams.microphone)return;
+      setStarting(true);setRetryable(false);
+      let capture:InterviewAudioCapture|undefined;
+      try {
+        capture=new InterviewAudioCapture(owner,sessionId,message=>{if(active)setError(message);},(value,rollover)=>{
+          if(current?.id===value.id)current=null;
+          if(active){setRecording(false);setSaving(false);setLocal(previous=>[...previous.filter(row=>row.id!==value.id),value]);}
+          if(mode==="cloud"&&value.blob.size)void uploadRef.current(value);
+          if(active&&!finished&&streams.microphone) {
+            if(rollover)void start();
+            else if(!stopping.has(value.id)){failed=true;setRetryable(true);}
+          }
+          stopping.delete(value.id);
+        });
+        current=capture;
+        await capture.start(streams);
+        // A disconnect, finish, or unmount can happen while audio is starting.
+        if(active&&!finished&&current===capture)setRecording(true);
+      } catch(error) {
+        failed=true;
+        await capture?.stop();
+        if(current===capture)current=null;
+        if(active){setRetryable(true);setError(error instanceof Error?error.message:"Automatic recording could not start.");}
+      } finally {if(active&&(!current||current===capture))setStarting(false);}
+    };
+    const finish=async()=>{finished=true;setRetryable(false);await stop();};
+    stopCapture.current=finish;
+    retryCapture.current=()=>{failed=false;setError("");void start();};
+    const unsubscribe=voice?.subscribeAudioStreams?.(next=>{
+      const reconnect=next.microphone!==streams.microphone;
+      streams=next;
+      if(!next.microphone){void stop().then(()=>{if(!failed)void start();});return;}
+      if(reconnect)failed=false;
+      current?.update(next);
+      void start();
+    });
+    return()=>{
+      active=false;finished=true;unsubscribe?.();void stop();
+      if(stopCapture.current===finish)stopCapture.current=async()=>{};
+      retryCapture.current=()=>{};
+    };
+  },[voice,owner,sessionId,mode]);
   const downloadLocal=(record:LocalRecording)=>{
     const url=URL.createObjectURL(record.blob);const link=document.createElement("a");
     link.href=url;link.download=recordingFilename(sessionId,record.id,record.mimeType);link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
@@ -93,7 +123,7 @@ export function SessionRecordings({sessionId,voice,live=false,ref}: {sessionId:s
     try {
       const response=await accountFetch(`/api/interviews/${sessionId}/recordings/${record.id}${download?"?download=true":""}`);const body=await response.json();
       if(!response.ok)throw new Error(body.error || "Could not open this recording.");
-      if(download){const link=document.createElement("a");link.href=body.url;link.click();}
+      if(download){const link=document.createElement("a");link.href=body.url;link.download="";link.click();}
       else setPlayback({id:record.id,url:body.url});
     }catch(error){setError(error instanceof Error?error.message:"Could not open this recording.");}finally{setBusy("");}
   };
@@ -107,10 +137,13 @@ export function SessionRecordings({sessionId,voice,live=false,ref}: {sessionId:s
   };
   const rows=[...cloud.filter(row=>row.status==="ready" && !local.some(value=>value.id===row.id)),...local].sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt));
   return <section className={`card ${styles.panel}`} aria-label="Session recordings">
-    <div className={styles.heading}><h3>Session recording</h3>{voice && <button type="button" className={`button ${recording?"button-secondary":"button-primary"} button-small`} disabled={starting||saving||(!recording&&!live)} onClick={()=>void(recording?stop():start())}>{recording?<Square size={12}/>:<Circle size={12}/>} {saving?"Saving recording…":starting?"Starting…":recording?"Stop recording":"Record interview"}</button>}</div>
+    <div className={styles.heading}><h3>Session recording</h3>{voice&&<span className="field-hint">Automatic recording · always on</span>}</div>
     {recording && <p className={styles.active} role="status"><span/>Recording your microphone and interviewer audio</p>}
-    <p className="field-hint">{mode==="cloud"?"Recordings upload privately to your account after stopping. Keep this page open until upload finishes. Your browser keeps a temporary copy for retries.":"Local preview: recordings stay in this browser and can be downloaded. Sign in to a connected workspace for long-term cloud storage."}</p>
-    {voice&&!live&&!recording && <p className="field-hint">Connect live voice to record both sides of the interview.</p>}
+    {starting&&<p className="field-hint" role="status">Starting automatic recording… If your browser pauses audio, click anywhere in the room to continue.</p>}
+    {saving&&<p className="field-hint" role="status">Saving recording…</p>}
+    <p className="field-hint">{mode==="cloud"?"Recordings upload privately to your account when the session ends or voice disconnects. Keep this page open until upload finishes. Your browser keeps a temporary copy for retries.":"Local preview: recordings stay in this browser and can be downloaded. Sign in to a connected workspace for long-term cloud storage."}</p>
+    {voice&&!live&&!recording&&!starting && <p className="field-hint">Recording starts automatically when your microphone connects. It cannot be turned off during a voice interview.</p>}
+    {retryable&&voice&&live&&!starting&&!recording&&<button type="button" className="button button-secondary button-small" onClick={()=>retryCapture.current()}>Retry automatic recording</button>}
     {mode==="cloud" && configured===false && <p className="inline-alert">Cloud recording storage is not connected yet. Download your local copies or retry uploading after setup.</p>}
     {rows.length>0 && <ul className={styles.list}>{rows.map((row,index)=>{
       const localRow="blob" in row?row:undefined;

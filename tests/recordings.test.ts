@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import "fake-indexeddb/auto";
 import { PGlite } from "@electric-sql/pglite";
-import { saveRecordingChunk, listLocalRecordings, deleteLocalRecording, deleteSessionLocalRecordings, type LocalRecordingMetadata } from "../src/lib/recordings/local";
+import { rememberUnsavedRecording, saveRecordingChunk, listLocalRecordings, deleteLocalRecording, deleteSessionLocalRecordings, type LocalRecordingMetadata } from "../src/lib/recordings/local";
 import { prepareRecording, getRecording, listRecordings, markRecordingReady, removeRecording, recordingUploadSchema } from "../src/lib/server/recordings";
 import { recordingStorageConfigured } from "../src/lib/server/recording-storage";
 import { saveMutation } from "../src/lib/server/workspace";
@@ -29,6 +29,17 @@ test("Recording metadata rejects arbitrary file types, excessive sizes, and inje
   assert.ok(recordingUploadSchema.safeParse(value).success);
   for(const invalid of [{mimeType:"text/html"},{sizeBytes:0},{sizeBytes:134217729},{durationMs:-1},{objectKey:"other-account"},{userId:memberId}])assert.equal(recordingUploadSchema.safeParse({...value,...invalid}).success,false);
   assert.equal(recordingStorageConfigured({}),false);
+});
+test("Unsaved audio survives review navigation, replaces partial chunks, and remains account scoped",async()=>{
+  const meta=metadata();
+  await saveRecordingChunk(meta,0,new Blob(["partial"]));
+  rememberUnsavedRecording({...meta,persisted:false,complete:true,blob:new Blob(["complete audio"])});
+  const rows=await listLocalRecordings(meta.owner,meta.sessionId);
+  assert.equal(rows.length,1);assert.equal(rows[0].persisted,false);
+  assert.equal(await rows[0].blob.text(),"complete audio");
+  assert.equal((await listLocalRecordings(memberId,meta.sessionId)).length,0);
+  await deleteSessionLocalRecordings(meta.owner,meta.sessionId);
+  assert.equal((await listLocalRecordings(meta.owner,meta.sessionId)).length,0);
 });
 test("Recording upload keeps a recoverable copy on failure and removes it only after cloud verification",async()=>{
   const target=new EventTarget();Object.assign(globalThis,{window:target});
