@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, AudioLines, CheckCircle2, Code2, FileText, Info, Mic, Play, ShieldCheck } from "lucide-react";
+import { ArrowRight, AudioLines, CheckCircle2, Code2, FileText, Info, Mic, Network, Play, ShieldCheck } from "lucide-react";
 import { interviewModules } from "@/lib/interview/modules";
 import { BrowserVoiceTransport } from "@/lib/interview/browser-voice";
 import { groupResumeProjects } from "@/lib/resume-projects";
@@ -80,7 +80,14 @@ export function InterviewSetup() {
       <h2 style={{marginBottom: 18}}>What would you like to practice?</h2>
       <div className={`interview-type-grid ${styles.types}`}>{(["coding", "behavioral", "project"] as const).map(value => <button className={`type-card ${type === value ? "selected" : ""}`} type="button" aria-pressed={type === value} key={value} onClick={() => {setType(value); setDuration(interviewModules[value].defaultDuration); setQuestionId(interviewModules[value].questions[0].id); setTopic(""); setError("");}}>
         {value === "coding" ? <Code2 size={22}/> : value === "project" ? <FileText size={22}/> : <AudioLines size={22}/>}<span className="selection-dot"/><strong>{interviewModules[value].title}</strong><p>{interviewModules[value].description}</p>
-      </button>)}</div>
+      </button>)}
+        <Link href="/interviews/system-design" className="type-card">
+          <Network size={22} aria-hidden="true"/>
+          <ArrowRight size={15} className={styles.entryArrow} aria-hidden="true"/>
+          <strong>System design interview</strong>
+          <p>Coming soon · Design a system and explain your tradeoffs.</p>
+        </Link>
+      </div>
       <div className="form-grid">
         {type !== "project" && <div><label htmlFor="session-topic">Focus area</label><select id="session-topic" value={topic} onChange={e => {setTopic(e.target.value); setQuestionId(module.questions.find(q => !e.target.value || q.topic === e.target.value)!.id);}}><option value="">All {type === "coding" ? "topics" : "competencies"}</option>{[...new Set(module.questions.map(q => q.topic))].map(t => <option key={t}>{t}</option>)}</select></div>}
         <div><label htmlFor="session-duration">Session length</label><select id="session-duration" value={duration} disabled={!timed} onChange={e => setDuration(Number(e.target.value))}>{[5, 15, 30, 45, 60, 90].map(value => <option value={value} key={value}>{value} minutes</option>)}</select></div>
