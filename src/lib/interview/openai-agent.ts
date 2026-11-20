@@ -1,7 +1,5 @@
 import { appFetch } from "../paths";
-import { problemById } from "../data/catalog";
-import { questionById } from "../data/behavioral";
-import { projectOpening } from "./modules";
+import { interviewOpening } from "./modules";
 import type { Attempt, InterviewSession, TranscriptEvent } from "../types";
 import { feedbackSchema } from "../validation";
 import type { CandidateInput, InterviewAgentAdapter, InterviewAgentEvent } from "./agent";
@@ -48,7 +46,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
   }
   private openTextChat() {
     const session = this.session;
-    if (session && !session.transcript.length && !this.disposed && !this.ending) this.say("interviewer", session.type === "coding" ? `Let's work on ${problemById(session.questionId)?.title}.` : session.type === "project" ? projectOpening(session.project) : questionById(session.questionId)!.question);
+    if (session && !session.transcript.length && !this.disposed && !this.ending) this.say("interviewer", interviewOpening(session));
   }
   connectVoice(onState: (listening: boolean) => void, onError: (message: string) => void) {
     if (this.disposed || this.ending || !this.session) return;
@@ -89,7 +87,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
   private async request(action: "reply" | "feedback" | "voice" | "verify", signal: AbortSignal, sdp?: string) {
     if (!this.session) throw new Error("Start an interview before connecting.");
     const response = await this.fetcher("/api/interview-agent", {method: "POST", headers: {"Content-Type": "application/json"}, signal,
-      body: JSON.stringify({action, session: agentSession(this.session), context: codeContext(this.context), ...(sdp ? {sdp} : {})})});
+      body: JSON.stringify({action, session: agentSession(this.session), context: this.session.type === "coding" ? codeContext(this.context) : undefined, ...(sdp ? {sdp} : {})})});
     const result = await response.json();
     if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "The AI interviewer could not answer. Your work is saved.");
     for (const attempt of result.attempts || []) this.acceptAttempt(attempt);
@@ -103,7 +101,11 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
     this.retryText = text;
     this.emit({type: "interviewer-state", state: "thinking"});
     if (this.liveVoice) {
-      try {this.voice.updateContext(JSON.stringify(codeContext(this.context))); this.voice.sendText(text); this.retryText = undefined;}
+      try {
+        if (this.session.type === "coding") this.voice.updateContext(JSON.stringify(codeContext(this.context)));
+        this.voice.sendText(text);
+        this.retryText = undefined;
+      }
       catch (error) {this.emit({type: "interviewer-state", state: "ready"}); throw error;}
       return;
     }
@@ -128,7 +130,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
       const result = await this.request("feedback", AbortSignal.any([abort.signal, AbortSignal.timeout(160000)]));
       if (!this.disposed) this.emit({type: "feedback", feedback: feedbackSchema.parse(result.feedback)});
     } catch {
-      this.emit({type: "feedback", feedback: {source: "agent", summary: "AI feedback was unavailable. Your transcript and saved work are preserved; no assessment was generated.", strengths: [], improvements: [], evidence: [], dimensions: [], nextActions: [this.session?.type === "project" ? "Review your saved conversation and project details." : "Review your saved conversation and code.", "Retry a practice session when the AI connection is available."]}});
+      this.emit({type: "feedback", feedback: {source: "agent", summary: "AI feedback was unavailable. Your transcript and saved work are preserved; no assessment was generated.", strengths: [], improvements: [], evidence: [], dimensions: [], nextActions: [this.session?.type === "coding" ? "Review your saved conversation and code." : "Review your saved conversation and notes.", "Retry a practice session when the AI connection is available."]}});
     }
     this.emit({type: "interviewer-state", state: "disconnected"});
   }

@@ -49,6 +49,10 @@ Admins may list account access details and suspend/restore ordinary members, but
 
 Workspace mutations, beacons, agent and admin requests bind to the application UUID captured at page load. Another tab switching accounts clears old state; stale requests cannot save into the new account. Story/link and session/event/feedback saves remain atomic. Password-reset GETs only display the form; the token is consumed by explicit submission. Logout and password recovery are available even when an account is suspended.
 
+## System design topics
+
+In Mock interviews, choose **System design interview**, then a topic. Add topics to `src/lib/data/system-design.ts` with a stable ID, a display title, and the opening design brief. Set `archived: true` to remove a topic from the picker and keep existing sessions available for review or resumption. The interviewer rules for chat, voice, and feedback live in `src/lib/server/prompts/system-design.ts`.
+
 ## Interview code verification
 
 Practice and submit code on LeetCode. During an interview, paste your solution into the editor and say “Please verify my code,” or explicitly state that your editor solution is finished. The interviewer can call the `verify_code` function in typed chat or live voice. The **Ask interviewer to judge** button sends that request too. The app cannot read an external LeetCode tab or synchronize LeetCode results.

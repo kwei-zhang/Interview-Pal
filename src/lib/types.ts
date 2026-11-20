@@ -2,7 +2,8 @@ export const languages = ["python", "javascript", "typescript"] as const;
 export type Language = typeof languages[number];
 export type Difficulty = "Easy" | "Medium" | "Hard";
 export type ProgressStatus = "not-started" | "practicing" | "solved";
-export type InterviewType = "coding" | "behavioral" | "project";
+export const interviewTypes = ["coding", "behavioral", "project", "system-design"] as const;
+export type InterviewType = typeof interviewTypes[number];
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 export interface Problem {

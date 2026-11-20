@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { agentRequestSchema, callInterviewer, interviewerInstructions, openAIConfig } from "../src/lib/server/openai-interviewer";
 import { OpenAIInterviewAgent } from "../src/lib/interview/openai-agent";
 import { RealtimeEvents } from "../src/lib/interview/realtime-events";
+import { systemDesignTopics } from "../src/lib/data/system-design";
 import { sessionSchema } from "../src/lib/validation";
 import { agentSession, codeContext } from "../src/lib/interview/context";
 import type { InterviewSession } from "../src/lib/types";
@@ -85,20 +86,24 @@ test("Behavioral agent context contains the selected question without preparatio
   assert.doesNotMatch(instructions, /SOLUTION REVEAL RULE|Contains Duplicate|sliding window|Coding language/);
 });
 
-for (const type of ["coding", "behavioral"] as const) {
+for (const type of ["coding", "behavioral", "system-design"] as const) {
   for (const action of ["reply", "voice", "feedback"] as const) {
     test(`${type} ${action} sends only its own interview prompt to the provider`, async () => {
-      const current = {...session(), type, questionId: type === "coding" ? "contains-duplicate" : "team-collaboration"};
+      const current = {...session(), type, questionId: type === "coding" ? "contains-duplicate" : type === "behavioral" ? "team-collaboration" : systemDesignTopics[0].id};
       await callInterviewer({action, session: sessionSchema.parse(agentSession(current)), ...(action === "voice" ? {sdp: "v=0\r\no=test-offer"} : {})}, config, async (_url, init) => {
         const body = action === "voice" ? JSON.parse(String((init!.body as FormData).get("session"))) : JSON.parse(String(init!.body));
         if (type === "coding") {
           assert.match(body.instructions, /SOLUTION REVEAL RULE/);
           assert.match(body.instructions, /Contains Duplicate/);
           assert.doesNotMatch(body.instructions, /FOCUSED FOLLOW-UPS|selected behavioral question/);
-        } else {
+        } else if (type === "behavioral") {
           assert.match(body.instructions, /FOCUSED FOLLOW-UPS/);
           assert.match(body.instructions, /collaboration made the difference/);
           assert.doesNotMatch(body.instructions, /SOLUTION REVEAL RULE|Contains Duplicate|test results|selected coding problem/);
+        } else {
+          assert.ok(body.instructions.includes(systemDesignTopics[0].prompt));
+          assert.equal(body.tools, undefined);
+          assert.doesNotMatch(body.instructions, /verify_code|team-collaboration|Contains Duplicate/);
         }
         if (action === "voice") {
           assert.match(body.instructions, /Speak first/);
@@ -107,7 +112,7 @@ for (const type of ["coding", "behavioral"] as const) {
         }
         if (action === "feedback") {
           assert.match(body.instructions, /The interview has ended/);
-          assert.match(body.instructions, type === "coding" ? /supplied conversation and test results/ : /candidate's actual story and answers/);
+          assert.match(body.instructions, type === "coding" ? /supplied conversation and test results/ : type === "behavioral" ? /candidate's actual story and answers/ : /requirements, scale, data flow, tradeoffs/);
           assert.equal(body.text.format.name, "interview_feedback");
           return output(JSON.stringify({summary: "Insufficient evidence.", strengths: [], improvements: [], evidence: [], nextActions: [], dimensions: []}));
         }
@@ -175,4 +180,37 @@ test("Disconnects and interrupted answers retain partial transcripts", () => {
   stream.finish();
   const transcript = events.filter(e => e.type === "transcript");
   assert.deepEqual(transcript.map(e => e.event.text), ["[Voice response was not transcribed before disconnecting]", "An empty array"]);
+});
+
+
+test("System design opens with the selected brief and resumes without sharing private notes", async () => {
+  const topic = systemDesignTopics.at(-1)!;
+  const current = sessionSchema.parse({...session(), type: "system-design", questionId: topic.id});
+  assert.equal(sessionSchema.safeParse({...current, questionId: "contains-duplicate"}).success, false);
+  assert.equal(agentRequestSchema.safeParse({action: "verify", session: current, context: {code: "print(1)"}}).success, false);
+  const events: InterviewAgentEvent[] = [];
+  const agent = new OpenAIInterviewAgent(async (_url, init) => {
+    const request = JSON.parse(String(init!.body));
+    assert.equal(request.session.questionId, topic.id);
+    assert.equal(request.session.scratchpad, "");
+    assert.equal(request.context, undefined);
+    return Response.json({text: "How would you handle a retry?"});
+  });
+  agent.subscribe(event => events.push(event));
+  try {
+    await agent.startSession(current);
+    await agent.sendInput({text: "I would assign each request a unique ID."});
+    const transcript = events.filter(event => event.type === "transcript").map(event => event.event);
+    assert.deepEqual(transcript.map(entry => entry.text), [topic.prompt, "I would assign each request a unique ID.", "How would you handle a retry?"]);
+    const resumed = sessionSchema.parse({...current, transcript});
+    await callInterviewer(agentRequestSchema.parse({action: "voice", session: agentSession(resumed), sdp: "v=0\r\no=test-offer"}), config, async (_url, init) => {
+      const voice = JSON.parse(String((init!.body as FormData).get("session")));
+      assert.match(voice.instructions, /Resume the system design conversation/);
+      assert.match(voice.instructions, /assign each request a unique ID/);
+      assert.doesNotMatch(voice.instructions, /Speak first/);
+      return new Response("v=0\r\no=test-answer");
+    });
+  } finally {
+    agent.dispose();
+  }
 });

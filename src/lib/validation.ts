@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { behavioralQuestions } from "./data/behavioral";
 import { problemById } from "./data/catalog";
-import { competencies, languages } from "./types";
+import { systemDesignTopicById } from "./data/system-design";
+import { competencies, interviewTypes, languages } from "./types";
 
 const shortText = z.string().max(200);
 const notes = z.string().max(20000);
@@ -34,11 +35,19 @@ export const projectInterviewSchema = z.object({
   bullets: z.array(z.string().trim().min(1).max(4000)).min(1).max(100),
 }).strict().refine(project => project.bullets.reduce((sum, text) => sum + text.length, 0) <= 20000, {message: "Keep the selected project's bullet points under 20,000 characters for an interview."});
 export const sessionSchema = z.object({
-  id: uuid, type: z.enum(["coding", "behavioral", "project"]), roleId: z.literal("software-engineer"), questionId,
+  id: uuid, type: z.enum(interviewTypes), roleId: z.literal("software-engineer"), questionId,
   durationMinutes: z.number().int().min(5).max(120), timed: z.boolean(), language,
   status: z.enum(["active", "completed", "interrupted"]), startedAt: timestamp, endedAt: timestamp.optional(), lastActiveAt: timestamp, elapsedSeconds: z.number().int().min(0).max(86400),
   scratchpad: notes, transcript: z.array(transcriptSchema).max(500), feedback: feedbackSchema.optional(), adapter: z.enum(["mock", "agent"]), project: projectInterviewSchema.optional(),
-}).strict().refine(s => s.type === "project" ? s.questionId === "project-overview" && Boolean(s.project) : !s.project && (s.type === "coding" ? Boolean(problemById(s.questionId)) : behavioralQuestions.some(q => q.id === s.questionId)), {message: "Choose an available interview question or a saved project."});
+}).strict().refine(s => {
+  if (s.type === "project") return s.questionId === "project-overview" && Boolean(s.project);
+  if (s.project) return false;
+  switch (s.type) {
+    case "coding": return Boolean(problemById(s.questionId));
+    case "behavioral": return behavioralQuestions.some(q => q.id === s.questionId);
+    case "system-design": return Boolean(systemDesignTopicById(s.questionId));
+  }
+}, {message: "Choose an available interview question, system design topic, or saved project."});
 export const mutationSchema = z.discriminatedUnion("kind", [
   z.object({kind: z.literal("profile"), value: profileSchema}).strict(),
   z.object({kind: z.literal("progress"), value: progressSchema}).strict(),

@@ -4,6 +4,7 @@ import type { Attempt, Feedback } from "../types";
 import { leetcodePrompt } from "./prompts/leetcode";
 import { behavioralPrompt } from "./prompts/behavioral";
 import { projectPrompt } from "./prompts/project";
+import { systemDesignPrompt } from "./prompts/system-design";
 import { feedbackSchema, sessionSchema } from "../validation";
 import { languages } from "../types";
 import { HttpError } from "./http";
@@ -20,7 +21,7 @@ export function openAIConfig(env: Record<string, string | undefined> = process.e
   if (!env.OPENAI_API_KEY?.trim()) throw new HttpError(503, "Add OPENAI_API_KEY to .env.local and restart the server to connect the AI interviewer.");
   return {key: env.OPENAI_API_KEY.trim(), chatModel: env.OPENAI_INTERVIEW_MODEL || "gpt-4.1-mini", realtimeModel: env.OPENAI_REALTIME_MODEL || "gpt-realtime-2.1"};
 }
-const interviewPrompts = {coding: leetcodePrompt, behavioral: behavioralPrompt, project: projectPrompt};
+const interviewPrompts = {coding: leetcodePrompt, behavioral: behavioralPrompt, project: projectPrompt, "system-design": systemDesignPrompt};
 
 export function interviewerInstructions(request: AgentRequest): string {
   return interviewPrompts[request.session.type].instructions(request);
