@@ -148,8 +148,9 @@ test("Navigation, Monaco assets, cookies, and agent requests stay in the app pat
   const cookies = (await context.cookies()).filter(cookie => cookie.name.startsWith("__Secure-neon-auth."));
   expect(cookies.length).toBeGreaterThan(0);
   expect(cookies.every(cookie => cookie.path === (mount || "/"))).toBe(true);
-  await page.getByRole("link", {name: "Coding practice"}).click();
-  await expect(page.getByRole("link", {name: "Coding practice"})).toHaveClass(/active/);
+  await page.getByRole("link", {name: "Prep", exact: true}).click();
+  await page.getByRole("link", {name: "Coding practice", exact: true}).click();
+  await expect(page.getByRole("link", {name: "Prep", exact: true})).toHaveAttribute("aria-current", "location");
   await page.getByRole("textbox", {name: "Search coding problems"}).fill("Two Sum");
   await page.getByRole("link", {name: "Two Sum", exact: false}).first().click();
   await page.getByRole("button", {name: "Use Monaco editor"}).click();

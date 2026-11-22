@@ -19,7 +19,11 @@ test("Dashboard and complete curriculum support meaningful filters", async ({pag
   await page.goto(mountedPath("/"));
   await expect(page.getByRole("heading", {name: "A little practice. A lot more confidence."})).toBeVisible();
   await page.screenshot({path: "/private/tmp/interview-pal-dashboard.png"});
-  await page.getByRole("link", {name: "Coding practice 150"}).click();
+  await page.getByRole("link", {name: "Prep", exact: true}).click();
+  const areas = page.getByRole("navigation", {name: "Prep areas"});
+  await expect(areas.getByRole("link")).toHaveCount(3);
+  await expect(page.getByRole("link", {name: "Prep", exact: true})).toHaveAttribute("aria-current", "page");
+  await areas.getByRole("link", {name: "Coding practice", exact: true}).click();
   await expect(page.getByText("1–25 of 150 problems")).toBeVisible();
   await expect(page.getByRole("checkbox", {name: "Python checks"})).toHaveCount(0);
   await expect(page.locator("tbody tr")).toHaveCount(25);
@@ -32,6 +36,7 @@ test("Dashboard and complete curriculum support meaningful filters", async ({pag
 });
 test("New Top Interview 150 starters switch languages, reset, and preserve drafts", async ({page}) => {
   await page.goto(mountedPath("/coding/merge-sorted-array"));
+  await expect(page.getByRole("link", {name: "Prep", exact: true})).toHaveAttribute("aria-current", "location");
   const editor = page.getByLabel("Solution code", {exact: true});
   await expect(editor).toHaveValue(/def merge\(nums1: List\[int\], m: int, nums2: List\[int\], n: int\) -> None:/);
   await editor.fill("# my merge draft");
@@ -138,6 +143,7 @@ test("Mobile navigation and themes remain usable", async ({page}) => {
   await page.setViewportSize({width: 390, height: 844});
   await page.goto(mountedPath("/"));
   await page.getByRole("button", {name: "Open navigation"}).click();
+  await page.getByRole("link", {name: "Prep", exact: true}).click();
   await page.getByRole("link", {name: "Behavioral prep", exact: true}).click();
   await expect(page.getByRole("heading", {name: "Find the story behind your skills."})).toBeVisible();
   await page.getByRole("button", {name: "Use dark theme"}).click();

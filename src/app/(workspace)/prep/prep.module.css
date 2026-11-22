@@ -1,0 +1,33 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+}
+
+.entry {
+  display: block;
+  padding: 22px;
+}
+
+.entry:hover,
+.entry:focus-visible {
+  border-color: var(--purple);
+}
+
+.icons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--purple);
+  margin-bottom: 18px;
+}
+
+.entry h2 {
+  font-size: 17px;
+  margin-bottom: 6px;
+}
+
+.entry p {
+  color: var(--muted);
+  font-size: 13px;
+}

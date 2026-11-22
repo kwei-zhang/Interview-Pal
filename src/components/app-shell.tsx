@@ -3,19 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, AudioLines, BookOpen, Check, Code2, FileText, History, LayoutDashboard, Menu, Moon, Settings2, Sun, X, CloudOff, RefreshCw, LockKeyhole } from "lucide-react";
+import { ArrowUpRight, AudioLines, BookOpen, Check, History, LayoutDashboard, Menu, Moon, Settings2, Sun, X, CloudOff, RefreshCw, LockKeyhole } from "lucide-react";
 import { useWorkspace } from "./workspace-provider";
 import { LoadingState } from "./ui";
-import { problems } from "@/lib/data/catalog";
+import { prepAreas } from "@/lib/prep-areas";
 
 const navigation = [
   {href: "/", label: "Overview", icon: LayoutDashboard},
-  {href: "/coding", label: "Coding practice", icon: Code2},
-  {href: "/behavioral", label: "Behavioral prep", icon: BookOpen},
-  {href: "/project-interview", label: "Project prep", icon: FileText},
+  {href: "/prep", label: "Prep", icon: BookOpen},
   {href: "/interviews", label: "Mock interviews", icon: AudioLines},
   {href: "/history", label: "Session history", icon: History},
 ];
+function matchesRoute(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function AppShell({children, email, admin = false}: {children: React.ReactNode; email?: string; admin?: boolean}) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -28,7 +30,9 @@ export function AppShell({children, email, admin = false}: {children: React.Reac
   }, []);
   useEffect(() => { setMobileOpen(false); }, [pathname]);
   const toggleTheme = () => { const value = !dark; setDark(value); localStorage.setItem("interview-pal.theme", value ? "dark" : "light"); document.documentElement.dataset.theme = value ? "dark" : "light"; };
-  const section = navigation.find(n => n.href === "/" ? pathname === "/" : pathname.startsWith(n.href))?.label || (pathname === "/admin" ? "Administration" : "Settings");
+  const prepArea = prepAreas.find(({href}) => matchesRoute(pathname, href));
+  const activeSection = navigation.find(({href}) => matchesRoute(prepArea ? "/prep" : pathname, href));
+  const section = prepArea?.label || activeSection?.label || (pathname === "/admin" ? "Administration" : "Settings");
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">Skip to content</a>
     {mobileOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMobileOpen(false)}/>}
@@ -36,7 +40,12 @@ export function AppShell({children, email, admin = false}: {children: React.Reac
       <Link className="brand" href="/"><span className="brand-symbol"><AudioLines size={22}/></span><span>interview<span className="brand-light">pal</span><span className="brand-dot">.</span></span></Link>
       <button className="icon-button mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X size={20}/></button>
       <div className="nav-label">YOUR PRACTICE SPACE</div>
-      <nav aria-label="Main navigation">{navigation.map(({href, label, icon: Icon}) => <Link key={href} href={href} className={`nav-item ${(href === "/" ? pathname === "/" : pathname.startsWith(href)) ? "active" : ""}`}><Icon size={18}/><span>{label}</span>{href === "/coding" && <span className="nav-count">{problems.length}</span>}</Link>)}</nav>
+      <nav aria-label="Main navigation">{navigation.map(({href, label, icon: Icon}) => (
+        <Link key={href} href={href} className={`nav-item ${href === activeSection?.href ? "active" : ""}`}
+          aria-current={href === activeSection?.href ? (href === pathname ? "page" : "location") : undefined}>
+          <Icon size={18}/><span>{label}</span>
+        </Link>
+      ))}</nav>
       <div className="sidebar-bottom">
         {admin && <Link href="/admin" className={`nav-item ${pathname === "/admin" ? "active" : ""}`}><LockKeyhole size={18}/>Administration</Link>}
         <Link href="/settings" className={`nav-item ${pathname === "/settings" ? "active" : ""}`}><Settings2 size={18}/>Settings</Link>

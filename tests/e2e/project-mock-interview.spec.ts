@@ -72,6 +72,7 @@ test("Selected resume points power a saved project conversation, resume, review 
   await page.evaluate(() => {if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); window.scrollTo(0, 0);});
   await page.screenshot({path: "/private/tmp/interview-pal-project-mock-room.png", fullPage: true});
   await page.getByRole("link", {name: "Leave and save for later"}).click();
+  await page.getByRole("link", {name: "Prep", exact: true}).click();
   await page.getByRole("link", {name: "Project prep", exact: true}).click();
   const project = page.getByRole("article").filter({has: page.getByRole("heading", {name: "Checkout service", exact: true})});
   await project.getByRole("button", {name: "Edit", exact: true}).click();

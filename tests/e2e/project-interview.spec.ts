@@ -12,10 +12,11 @@ test("Resume material upgrades old workspaces, saves, edits, exports, and delete
     localStorage.setItem("interview-pal.theme", "light");
   });
   await page.goto(mountedPath("/"));
+  await page.getByRole("link", {name: "Prep", exact: true}).click();
   await page.getByRole("link", {name: "Project prep", exact: true}).click();
   await expect(page).toHaveURL(new RegExp(`${mountedPath("/project-interview")}$`));
   await expect(page.getByRole("heading", {name: "Project interview", exact: true})).toBeVisible();
-  await expect(page.getByRole("link", {name: "Project prep", exact: true})).toHaveClass(/active/);
+  await expect(page.getByRole("link", {name: "Prep", exact: true})).toHaveAttribute("aria-current", "location");
   await expect(page.locator(".breadcrumb")).toContainText("Project prep");
   await expect(page.getByText("No projects yet", {exact: true})).toBeVisible();
   await expect(page.locator(".sidebar-user")).toContainText("Existing owner");
@@ -55,6 +56,7 @@ test("Resume material upgrades old workspaces, saves, edits, exports, and delete
   expect(backup.workspace.resumeBullets).toHaveLength(2);
   expect(backup.workspace.profile.displayName).toBe("Existing owner");
 
+  await page.getByRole("link", {name: "Prep", exact: true}).click();
   await page.getByRole("link", {name: "Project prep", exact: true}).click();
   const checkout = page.getByRole("article").filter({hasText: "Checkout service · Acme"});
   await checkout.getByRole("button", {name: "Delete", exact: true}).click();
@@ -74,6 +76,7 @@ test("Project interview works in mobile navigation and dark mode", async ({page}
   await page.addInitScript(() => localStorage.setItem("interview-pal.theme", "light"));
   await page.goto(mountedPath("/"));
   await page.getByRole("button", {name: "Open navigation"}).click();
+  await page.getByRole("link", {name: "Prep", exact: true}).click();
   await page.getByRole("link", {name: "Project prep", exact: true}).click();
   await expect(page.getByRole("heading", {name: "Project interview", exact: true})).toBeVisible();
   await expect(page.locator(".sidebar")).not.toHaveClass(/sidebar-open/);
