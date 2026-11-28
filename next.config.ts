@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   basePath,
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
+  experimental: {agentUpgrade: "security"},
   // Recovery URLs contain one-time credentials. Keep them out of dev logs.
   logging: {incomingRequests: {ignore: [/\/reset-password/]}},
   async headers() {
