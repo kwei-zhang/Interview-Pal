@@ -236,3 +236,39 @@ test("System design interviewer notes stay out of client code", async () => {
   const files = (await readdir("src", {recursive: true})).filter(file => /\.(ts|tsx)$/.test(file) && !file.startsWith("lib/server/"));
   for (const file of files) assert.doesNotMatch(await readFile(`src/${file}`, "utf8"), /system-design-notes/, file);
 });
+
+test("System design interviewer runs the four-phase structure with a time budget", () => {
+  const base = sessionSchema.parse(agentSession({...session(), type: "system-design", questionId: "url-shortener", elapsedSeconds: 20 * 60}));
+  const reply = interviewerInstructions({action: "reply", session: base});
+  assert.match(reply, /INTERVIEW STRUCTURE/);
+  for (const phase of ["SCOPE", "HIGH-LEVEL DESIGN", "DEEP DIVE", "WRAP-UP"]) assert.ok(reply.includes(`${phase}:`), phase);
+  assert.match(reply, /Scope 3-10 min; High-level design 10-15 min; Deep dive 10-25 min; Wrap-up 3-5 min/);
+  assert.match(reply, /About 20 of 45 minutes have elapsed/);
+  assert.match(reply, /They are a reference point, not the expected solution/);
+
+  const voice = interviewerInstructions({action: "voice", session: base});
+  assert.match(voice, /cannot see a clock/);
+  assert.doesNotMatch(voice, /minutes have elapsed/);
+
+  const untimed = interviewerInstructions({action: "reply", session: {...base, timed: false}});
+  assert.match(untimed, /The interview is untimed/);
+  assert.doesNotMatch(untimed, /phase budget/);
+});
+
+test("Agent requests report time elapsed since the session started", async t => {
+  let now = 1_000_000;
+  t.mock.method(Date, "now", () => now);
+  const sent: number[] = [];
+  const agent = new OpenAIInterviewAgent(async (_url, init) => {
+    sent.push(JSON.parse(String(init!.body)).session.elapsedSeconds);
+    return Response.json({text: "Go on."});
+  });
+  try {
+    await agent.startSession(sessionSchema.parse({...session(), type: "system-design", questionId: "url-shortener", elapsedSeconds: 600}));
+    now += 7 * 60 * 1000;
+    await agent.sendInput({text: "Let me sketch the write path."});
+    assert.deepEqual(sent, [600 + 7 * 60]);
+  } finally {
+    agent.dispose();
+  }
+});

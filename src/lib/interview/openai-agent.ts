@@ -12,6 +12,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
   get liveVoice() {return this.voice.connected;}
   private listeners = new Set<(event: InterviewAgentEvent) => void>();
   private session?: InterviewSession;
+  private startedAtMs = 0;
   private context: Partial<CandidateInput> = {};
   private contextTimer?: ReturnType<typeof setTimeout>;
   private disposed = false;
@@ -40,6 +41,7 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
   private say(role: TranscriptEvent["role"], text: string) {this.emit({type: "transcript", event: {id: crypto.randomUUID(), role, text, timestamp: new Date().toISOString()}});}
   async startSession(session: InterviewSession) {
     this.session = {...session, transcript: [...session.transcript]};
+    this.startedAtMs = Date.now();
     this.retryText = session.transcript.at(-1)?.role === "candidate" ? session.transcript.at(-1)?.text : undefined;
     this.emit({type: "interviewer-state", state: "ready"});
     if (!this.voice.available) this.openTextChat();
@@ -86,8 +88,10 @@ export class OpenAIInterviewAgent implements InterviewAgentAdapter {
   }
   private async request(action: "reply" | "feedback" | "voice" | "verify", signal: AbortSignal, sdp?: string) {
     if (!this.session) throw new Error("Start an interview before connecting.");
+    // The stored session is a start-time copy; send the time elapsed so far so the interviewer can pace itself.
+    const elapsedSeconds = Math.min(86400, this.session.elapsedSeconds + Math.floor((Date.now() - this.startedAtMs) / 1000));
     const response = await this.fetcher("/api/interview-agent", {method: "POST", headers: {"Content-Type": "application/json"}, signal,
-      body: JSON.stringify({action, session: agentSession(this.session), context: this.session.type === "coding" ? codeContext(this.context) : undefined, ...(sdp ? {sdp} : {})})});
+      body: JSON.stringify({action, session: agentSession({...this.session, elapsedSeconds}), context: this.session.type === "coding" ? codeContext(this.context) : undefined, ...(sdp ? {sdp} : {})})});
     const result = await response.json();
     if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "The AI interviewer could not answer. Your work is saved.");
     for (const attempt of result.attempts || []) this.acceptAttempt(attempt);

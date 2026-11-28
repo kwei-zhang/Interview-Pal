@@ -17,8 +17,9 @@ export interface SystemDesignInterviewerNotes {
   changedConstraints: string[];
 }
 
-// URL shortener conditions follow the scenario in "System Design Interview" (Alex Xu, vol. 1, ch. 8),
-// restated here in our own words and extended with deeper follow-ups.
+// URL shortener requirements use "System Design Interview" (Alex Xu, vol. 1, ch. 8) as a reference,
+// restated in our own words. The book's design is one valid answer among many; the deep dives
+// below deliberately list several approaches so the interviewer does not expect the book's.
 const urlShortener: SystemDesignInterviewerNotes = {
   facts: [
     {topic: "Example behavior", answer: "A long URL such as https://shop.example.com/products/item?id=48213&ref=newsletter&utm_campaign=spring gets a short alias such as https://short.ly/aB3kQ9x. Opening the alias redirects to the original URL."},
@@ -47,9 +48,8 @@ const urlShortener: SystemDesignInterviewerNotes = {
     "Code length: with 62 characters, 62^6 is about 56.8 billion (too few) and 62^7 is about 3.5 trillion (enough), so 7 characters.",
   ],
   deepDives: [
-    "Short code generation: hashing the long URL (e.g. CRC32, MD5 or SHA-1) and truncating to 7 characters, versus base-62 encoding of a unique numeric ID. Ask how they handle collisions, whether codes are predictable, and whether the same long URL maps to the same code.",
-    "Collision handling for the hash approach: what happens when two URLs truncate to the same code, the cost of checking the database on every write, and whether a Bloom filter helps and what its false positives mean.",
-    "Unique ID generation for the base-62 approach: how IDs stay unique across many servers (central counter, pre-allocated ranges, timestamp-based IDs) and what happens when an ID service node fails.",
+    "Short code generation: how codes are produced and kept unique. Valid approaches include hashing the long URL and truncating, base-62 encoding a unique numeric ID, random codes with a uniqueness check, or a pool of pre-generated keys. Probe whichever they chose: collisions, predictability, and whether the same long URL maps to the same code.",
+    "Uniqueness under concurrency: for hash or random codes, what happens on a collision and what each existence check costs on the write path (and whether something like a Bloom filter helps, with its false positives). For ID or key-pool approaches, how IDs or keys stay unique across many servers and what happens when that service fails.",
     "Redirect path: 301 (permanent, browsers cache it, less load) versus 302 (temporary, every click reaches the service, needed for click tracking), and the consequence of each.",
     "Read scaling: caching short-to-long mappings for a 10:1 read-heavy workload, hot links that go viral, cache misses for unknown codes, and what happens when the cache is cold or down.",
     "Data model and storage: the short URL to long URL table, which lookups need indexes (by short code, and by long URL if deduplicating), and how to shard about 365 billion rows across machines.",
