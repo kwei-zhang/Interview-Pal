@@ -15,3 +15,6 @@ playwright-report/
 .vercel/
 .DS_Store
 public/vendor/
+
+# Local Claude Code preview config
+/.claude/launch.json
