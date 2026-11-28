@@ -214,3 +214,25 @@ test("System design opens with the selected brief and resumes without sharing pr
     agent.dispose();
   }
 });
+
+test("System design topics with interviewer notes send them to the interviewer only", () => {
+  const withNotes = sessionSchema.parse({...session(), type: "system-design", questionId: "url-shortener"});
+  const instructions = interviewerInstructions({action: "reply", session: sessionSchema.parse(agentSession(withNotes))});
+  assert.match(instructions, /INTERVIEWER NOTES/);
+  assert.match(instructions, /<interviewer_notes>/);
+  assert.match(instructions, /100 million new short URLs are created per day/);
+  assert.match(instructions, /62\^7 is about 3\.5 trillion/);
+  assert.match(instructions, /Never state them first/);
+  assert.ok(!instructions.includes("private scratchpad"));
+
+  const withoutNotes = sessionSchema.parse({...session(), type: "system-design", questionId: "notification-service"});
+  const plain = interviewerInstructions({action: "reply", session: sessionSchema.parse(agentSession(withoutNotes))});
+  assert.doesNotMatch(plain, /INTERVIEWER NOTES|interviewer_notes|short URLs/);
+  assert.match(plain, /Use only the brief and the conversation/);
+});
+
+test("System design interviewer notes stay out of client code", async () => {
+  const {readdir, readFile} = await import("node:fs/promises");
+  const files = (await readdir("src", {recursive: true})).filter(file => /\.(ts|tsx)$/.test(file) && !file.startsWith("lib/server/"));
+  for (const file of files) assert.doesNotMatch(await readFile(`src/${file}`, "utf8"), /system-design-notes/, file);
+});
