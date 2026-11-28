@@ -222,7 +222,7 @@ test("System design topics with interviewer notes send them to the interviewer o
   assert.match(instructions, /<interviewer_notes>/);
   assert.match(instructions, /100 million new short URLs are created per day/);
   assert.match(instructions, /62\^7 is about 3\.5 trillion/);
-  assert.match(instructions, /Never state them first/);
+  assert.match(instructions, /never state them first/i);
   assert.ok(!instructions.includes("private scratchpad"));
 
   const withoutNotes = sessionSchema.parse({...session(), type: "system-design", questionId: "notification-service"});
@@ -245,6 +245,10 @@ test("System design interviewer runs the four-phase structure with a time budget
   assert.match(reply, /Scope 3-10 min; High-level design 10-15 min; Deep dive 10-25 min; Wrap-up 3-5 min/);
   assert.match(reply, /About 20 of 45 minutes have elapsed/);
   assert.match(reply, /They are a reference point, not the expected solution/);
+  assert.match(reply, /reference values to fall back on, not fixed requirements/);
+  assert.match(reply, /Do not correct it to match the notes/);
+  assert.match(reply, /Once a value is agreed, it replaces the fact/);
+  assert.match(reply, /check the math against the agreed assumptions/);
 
   const voice = interviewerInstructions({action: "voice", session: base});
   assert.match(voice, /cannot see a clock/);

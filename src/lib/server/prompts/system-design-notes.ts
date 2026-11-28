@@ -3,11 +3,11 @@
 // Keys match the topic IDs in src/lib/data/system-design.ts.
 
 export interface SystemDesignInterviewerNotes {
-  /** Facts the interviewer states only when the candidate asks about that dimension. */
+  /** Reference values the interviewer can fall back on. The candidate's plausible proposals take priority. */
   facts: {topic: string; answer: string}[];
   /** Things the interviewer has no fixed answer for; the candidate chooses a working assumption. */
   candidateChooses: string[];
-  /** Expected estimates, used to check the candidate's math. Never volunteered. */
+  /** Estimates worked from the reference facts. Only valid when the candidate uses those same values. */
   estimates: string[];
   /** Areas worth probing after the high-level design, chosen to fit the candidate's design. */
   deepDives: string[];
@@ -44,6 +44,7 @@ const urlShortener: SystemDesignInterviewerNotes = {
     "Writes: 100M / 86,400 s is about 1,160 per second on average.",
     "Reads: 10x writes is about 11,600 redirects per second on average; peak is higher by whatever factor the candidate assumes.",
     "Records: 100M x 365 x 10 years is about 365 billion short URLs.",
+    "If the candidate agreed different values, recompute from theirs: these figures no longer apply.",
     "Storage: 365 billion x ~100 bytes is about 36.5 TB of long URLs before indexes, replication and metadata. Accept a reasonable order of magnitude if the reasoning is sound.",
     "Code length: with 62 characters, 62^6 is about 56.8 billion (too few) and 62^7 is about 3.5 trillion (enough), so 7 characters.",
   ],
@@ -56,7 +57,7 @@ const urlShortener: SystemDesignInterviewerNotes = {
     "Abuse: one client flooding the shorten endpoint, rate limiting by IP or key, and enumeration of sequential codes.",
   ],
   pitfalls: [
-    "Codes that cannot cover 365 billion URLs (6 characters or fewer with 62 symbols).",
+    "A code length that cannot cover the agreed volume over the agreed retention period (with the reference facts, 6 characters or fewer with 62 symbols).",
     "Truncating a hash with no plan for collisions.",
     "A single counter or database instance as the only ID source, with no answer for its failure.",
     "Choosing 301 and then claiming accurate per-click analytics.",
